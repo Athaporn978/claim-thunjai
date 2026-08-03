@@ -1,0 +1,16 @@
+[Unit]
+Description=Claim Thunjai Next.js App
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/claim-thunjai
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/bin/bash -lc 'cd /var/www/claim-thunjai && npx prisma migrate deploy && npm run start -- --hostname 0.0.0.0 --port 3000'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

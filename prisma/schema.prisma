@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Insurer {
+  id        String   @id @default(cuid())
+  name      String
+  nameTh    String
+  logoUrl   String?
+  apiKey    String   @unique @default(cuid())
+  plan      String   @default("trial") // trial | pro | enterprise
+  createdAt DateTime @default(now())
+  claims    Claim[]
+}
+
+model Claim {
+  id              String        @id @default(cuid())
+  claimNumber     String        @unique
+  insurerId       String
+  insurer         Insurer       @relation(fields: [insurerId], references: [id])
+  policyHolder    String
+  vehicleMake     String?
+  vehicleModel    String?
+  vehicleYear     Int?
+  licensePlate    String?
+  status          String        @default("pending") // pending | analyzed | reviewed | closed
+  overallSeverity String?       // minor | moderate | severe | total_loss
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  reports         DamageReport[]
+}
+
+// Official price catalog from สมาคมอู่กลางการประกันภัย (uklang.com)
+// One row per (vehicleType, part, size) — provides 4 price tiers
+model RepairPrice {
+  id          Int     @id @default(autoincrement())
+  vehicleType String  // sedan_asia | sedan_eu | pickup | van
+  partTh      String  // canonical Thai part name from uklang catalog
+  size        String  // A (small) | B (medium) | C (large)
+  minor       Float?  // ซ่อมเบา
+  moderate    Float?  // ซ่อมกลาง
+  severe      Float?  // ซ่อมหนัก
+  replace     Float?  // เปลี่ยน (full part replacement)
+  note        String?
+
+  @@unique([vehicleType, partTh, size])
+  @@index([partTh])
+}
+
+// Realistic spare part reference prices catalog (by brand, model, year)
+model PartCatalogPrice {
+  id               Int     @id @default(autoincrement())
+  brand            String  // Honda, Toyota, Isuzu, Mazda, Nissan, BMW, Mercedes-Benz, BYD
+  model            String  // Accord, Civic, City, Camry, Altis, Revo, D-Max, Mazda 3, 3 Series
+  yearRange        String  // e.g. "2019-2024"
+  category         String  // sedan_asia | sedan_eu | pickup | suv | van
+  partTh           String  // กันชนหน้า, ฝากระโปรงหน้า, โคมไฟหน้า LED
+  partEn           String? // Front Bumper, Hood, Right Headlight LED
+  oemPrice         Float   // ราคาอะไหล่แท้ศูนย์ (OEM)
+  aftermarketPrice Float?  // ราคาอะไหล่เทียบแท้
+  usedPrice        Float?  // ราคาอะไหล่มือสอง / เชียงกง
+  note             String? // หมายเหตุ
+
+  @@unique([brand, model, partTh])
+  @@index([brand, model])
+  @@index([partTh])
+}
+
+model DamageReport {
+  id          String   @id @default(cuid())
+  claimId     String
+  claim       Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  imageUrl    String
+  angle       String?
+  damages     String   // JSON: [{ part, severity, description, bbox, confidence }]
+  rawResponse String?
+  createdAt   DateTime @default(now())
+}
+
+// Policy renewal self-inspection case. Admin creates the case, system emails a
+// unique link to the customer, customer takes 8-angle + doc photos on mobile,
+// AI validates on submit, admin reviews the result.
+model InspectionCase {
+  id              String   @id @default(cuid())
+  caseNo          String   @unique
+  token           String   @unique   // URL slug for /inspect/[token]
+  status          String   @default("pending")  // pending | submitted | passed | review | approved | rejected
+  customer        String
+  licensePlate    String?
+  email           String?
+  phone           String?
+  deliveryChannel String   @default("email")     // email | sms (future)
+  emailSentAt     DateTime?
+
+  shots       String?  // JSON { [angleId]: dataURL }
+  validation  String?  // JSON { status, flags[] }
+
+  createdAt   DateTime @default(now())
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewNote  String?
+}
+
+// Email intake — a case ingested from a service-center email (semi-automated).
+// AI extracts fields + analyzes photos; staff reviews/completes missing data.
+model Intake {
+  id          String   @id @default(cuid())
+  intakeNo    String   @unique
+  fromEmail   String?
+  subject     String?
+  emailBody   String?
+  status      String   @default("received") // received | processing | needs_info | completed | failed
+
+  // AI-extracted (staff can edit)
+  customer     String?
+  licensePlate String?
+  vehicleMake  String?
+  vehicleModel String?
+  vehicleYear  Int?
+  claimNumber  String?
+  policyNo     String?
+  insurer      String?
+  centerName   String?
+  centerContact String?
+
+  photos   String?  // JSON: [{ url(dataURL) }]
+  analysis String?  // JSON: { results, overallSeverity, totalLow, totalHigh, damageCount }
+  missing  String?  // JSON: [fieldName]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Repair quotation review — staff records the service-center quote vs. controlled
+// (negotiated-down) price to surface SAVING for the insurer.
+model Quotation {
+  id          String   @id @default(cuid())
+  quotationNo String   @unique
+  status      String   @default("draft") // draft | pending_review | pending_approval | approved | rejected
+
+  // 1) Customer
+  customerName    String?
+  licensePlate    String?
+  vehicleCategory String?  // sedan_asia | sedan_eu | pickup | van (drives standard-price lookup)
+  vehicleBrand    String?
+  vehicleModel    String?
+  vehicleYear     Int?
+  chassisNo       String?
+  color           String?
+  mileage         Int?
+
+  // 2) Insurance
+  insurerName   String?
+  claimNo       String?
+  insVehicleType String?
+  policyNo      String?
+  policyType    String?
+  sumInsured    Float?
+  coverageStart DateTime?
+  coverageEnd   DateTime?
+  deductible    Float?
+
+  // 3) Service center
+  centerName    String?
+  centerAddress String?
+  centerContact String?
+
+  // Standard-price lookup context
+  vehicleSize String @default("B") // A | B | C
+
+  // Vehicle photos — JSON array of { url(dataURL), caption? }
+  photos String?
+
+  // Denormalized totals (for list display)
+  totalQuoted     Float @default(0)
+  totalControlled Float @default(0)
+  totalSaving     Float @default(0)
+
+  // Approval & SLA Tracking
+  approvedAt DateTime?
+  approvedBy String?
+  startedAt  DateTime?
+  submittedAt DateTime?
+  creationMode String? @default("ai_extract") // "ai_extract" | "manual"
+  processingTimeSec Int?
+
+  createdByName  String?
+  createdByEmail String?
+
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  items     QuotationItem[]
+  logs      QuotationLog[]
+}
+
+model QuotationItem {
+  id          String  @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  type String // "labor" | "part"
+  name String
+
+  quotedUnit Float @default(0)
+  quotedQty  Float @default(1)
+
+  controlledUnit Float @default(0)
+  controlledQty  Float @default(1)
+
+  standardPrice Float?  // pulled from uklang catalog (reference)
+  note          String?
+  sortOrder     Int     @default(0)
+
+  @@index([quotationId])
+}
+
+model QuotationLog {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  authorName String
+  authorRole String?
+  action     String // "CREATED" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EDITED"
+  comment    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([quotationId])
+}
+
+model Branch {
+  id        String     @id @default(cuid())
+  code      String     @unique
+  name      String
+  address   String?
+  phone     String?
+  status    String     @default("active")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  employees Employee[]
+  quotations Quotation[]
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  name        String
+  description String?
+  permissions String?
+  status      String     @default("active")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  employees   Employee[]
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  email     String   @unique
+  username  String?  @unique
+  password  String?
+  phone     String?
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  roleId    String?
+  role      Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkflowSetting {
+  id              String   @id @default("default")
+  enabled         Boolean  @default(true)
+  ruleMode        String   @default("THRESHOLD") // "ALL" | "THRESHOLD" | "DIRECT"
+  thresholdAmount Float    @default(50000)
+  approverRoleIds String   @default("[]") // JSON array of Role IDs
+  updatedAt       DateTime @updatedAt
+}
+
+model SystemAuditLog {
+  id            String   @id @default(cuid())
+  module        String   // "BRANCH" | "ROLE" | "EMPLOYEE" | "WORKFLOW_SETTING"
+  action        String   // "CREATE" | "UPDATE" | "DELETE" | "IMPORT"
+  entityId      String?
+  entityName    String?
+  details       String?
+  performerName String   @default("ผู้ดูแลระบบ (Admin)")
+  createdAt     DateTime @default(now())
+
+  @@index([module])
+  @@index([createdAt])
+}
