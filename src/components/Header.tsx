@@ -30,10 +30,8 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Brand Logo - Apple Style */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-full bg-[#0071e3] flex items-center justify-center shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
+          <div className="w-9 h-9 rounded-full overflow-hidden shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
+            <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-extrabold text-base tracking-tight text-[#1d1d1f] group-hover:text-[#0071e3] transition">

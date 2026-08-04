@@ -122,8 +122,8 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
           const email = String(u.email || "").toLowerCase();
 
           const isSuperAdmin =
-            email === "athaporn@techthunjai.com" ||
-            email === "admin@techthunjai.com" ||
+            email === "athaporn@htechnology.com" ||
+            email === "admin@htechnology.com" ||
             roleName === "super administrator" ||
             roleName === "admin";
 
@@ -584,8 +584,8 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
         <div className="flex items-start justify-between border-b border-slate-200 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-[var(--navy-900)] flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-[var(--orange-500)]" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              <div className="w-9 h-9 rounded-lg overflow-hidden">
+                <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
               </div>
               <div>
                 <div className="font-bold text-[var(--navy-900)]">ClaimThunJai</div>

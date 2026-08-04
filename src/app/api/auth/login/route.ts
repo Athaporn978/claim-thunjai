@@ -31,66 +31,66 @@ export async function POST(req: NextRequest) {
 
     if (!employee) {
       // Demo credentials fallback for testing
-      if (email === "admin@claimthunjai.com" || email === "athaporn@techthunjai.com" || email === "admin@techthunjai.com") {
+      if (email === "admin@claimthunjai.com" || email === "athaporn@htechnology.com" || email === "admin@htechnology.com") {
         return NextResponse.json({
           success: true,
           user: {
             id: "admin-default",
             code: "EMP-001",
             name: "อรรถพล โชคชัย (Super Admin)",
-            email: "athaporn@techthunjai.com",
+            email: "athaporn@htechnology.com",
             roleName: "Super Administrator",
             branchName: "สำนักงานใหญ่ (กรุงเทพมหานคร)",
           },
         });
       }
-      if (email === "somchai@techthunjai.com") {
+      if (email === "somchai@htechnology.com") {
         return NextResponse.json({
           success: true,
           user: {
             id: "emp-somchai",
             code: "EMP-002",
             name: "สมชาย มีสุข (สาขาลาดพร้าว)",
-            email: "somchai@techthunjai.com",
+            email: "somchai@htechnology.com",
             roleName: "เจ้าหน้าที่คุมราคา",
             branchName: "สาขาลาดพร้าว (กรุงเทพมหานคร)",
           },
         });
       }
-      if (email === "kanya@techthunjai.com") {
+      if (email === "kanya@htechnology.com") {
         return NextResponse.json({
           success: true,
           user: {
             id: "emp-kanya",
             code: "EMP-003",
             name: "กัญญา วงศ์ใหญ่ (สาขาเชียงใหม่)",
-            email: "kanya@techthunjai.com",
+            email: "kanya@htechnology.com",
             roleName: "เจ้าหน้าที่คุมราคา",
             branchName: "สาขาเชียงใหม่",
           },
         });
       }
-      if (email === "supervisor_latphrao@techthunjai.com") {
+      if (email === "supervisor_latphrao@htechnology.com") {
         return NextResponse.json({
           success: true,
           user: {
             id: "emp-sup-latphrao",
             code: "EMP-005",
             name: "สมเกียรติ ยิ่งใหญ่ (หัวหน้าคุมราคา-ลาดพร้าว)",
-            email: "supervisor_latphrao@techthunjai.com",
+            email: "supervisor_latphrao@htechnology.com",
             roleName: "หัวหน้าคุมราคา (Supervisor)",
             branchName: "สาขาลาดพร้าว (กรุงเทพมหานคร)",
           },
         });
       }
-      if (email === "supervisor_chiangmai@techthunjai.com") {
+      if (email === "supervisor_chiangmai@htechnology.com") {
         return NextResponse.json({
           success: true,
           user: {
             id: "emp-sup-chiangmai",
             code: "EMP-006",
             name: "นภา สว่างจิต (หัวหน้าคุมราคา-เชียงใหม่)",
-            email: "supervisor_chiangmai@techthunjai.com",
+            email: "supervisor_chiangmai@htechnology.com",
             roleName: "หัวหน้าคุมราคา (Supervisor)",
             branchName: "สาขาเชียงใหม่",
           },

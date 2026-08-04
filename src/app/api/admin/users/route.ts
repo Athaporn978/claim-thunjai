@@ -35,7 +35,7 @@ export async function GET() {
     if (employees.length === 0 && defaultBranch && defaultRole) {
       await prisma.employee.createMany({
         data: [
-          { code: "EMP-001", name: "อรรถพล โชคชัย", email: "athaporn@techthunjai.com", username: "athaporn", password: "password123", phone: "065-882-8333", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
+          { code: "EMP-001", name: "อรรถพล โชคชัย", email: "athaporn@htechnology.com", username: "athaporn", password: "password123", phone: "065-882-8333", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
           { code: "EMP-002", name: "สมชาย ใจดี", email: "somchai@claimthunjai.com", username: "somchai", password: "password123", phone: "081-234-5678", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
         ],
       });

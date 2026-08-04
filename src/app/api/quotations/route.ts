@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     const isWfDisabled = !wfSetting || wfSetting.enabled === false || wfSetting.ruleMode === "DIRECT";
     const targetStatus = isWfDisabled ? "approved" : (body.status === "draft" ? "draft" : "pending_approval");
 
-    const createdByEmail = (body as any).createdByEmail || "somchai@techthunjai.com";
+    const createdByEmail = (body as any).createdByEmail || "somchai@htechnology.com";
     const createdByName = (body as any).createdByName || (createdByEmail.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี");
 
     // Assign Creator Branch

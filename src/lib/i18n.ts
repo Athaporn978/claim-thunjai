@@ -57,7 +57,6 @@ export const dict = {
       ],
     },
     cta: { title: "Ready to modernize your claim flow?", sub: "Talk to our team. Live demo in 15 minutes.", btn: "Schedule a Demo" },
-    footer: "© 2026 TECHTHUNJAI INNOVATION CO., LTD. All rights reserved.",
     analyze: {
       title: "Analyze Vehicle Damage",
       sub: "Upload photos of the damaged vehicle. AI will detect and classify each damage.",
@@ -147,7 +146,6 @@ export const dict = {
       ],
     },
     cta: { title: "พร้อมยกระดับการจัดการเคลมแล้วหรือยัง?", sub: "คุยกับทีมเรา Demo สด 15 นาที", btn: "นัด Demo" },
-    footer: "© 2026 บริษัท เทคทันใจ อินโนเวชั่น จำกัด (TECHTHUNJAI INNOVATION CO., LTD.). All rights reserved.",
     analyze: {
       title: "วิเคราะห์ความเสียหายรถยนต์",
       sub: "อัปโหลดภาพรถที่เสียหาย AI จะตรวจจับและจัดประเภทความเสียหายแต่ละจุด",

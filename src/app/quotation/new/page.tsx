@@ -248,7 +248,7 @@ function Wizard() {
         if (raw) sessionUser = JSON.parse(raw);
       } catch {}
 
-      const userEmail = sessionUser?.email || "somchai@techthunjai.com";
+      const userEmail = sessionUser?.email || "somchai@htechnology.com";
       const userName = sessionUser?.name || sessionUser?.fullName || (userEmail.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี");
       const userBranch = sessionUser?.branchName || sessionUser?.branch || (userEmail.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)");
 

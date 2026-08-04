@@ -96,8 +96,8 @@ export async function POST(req: Request) {
     const isSuperAdmin =
       roleLower.includes("super") ||
       roleLower.includes("admin") ||
-      emailLower.includes("admin@techthunjai.com") ||
-      emailLower.includes("athaporn@techthunjai.com");
+      emailLower.includes("admin@htechnology.com") ||
+      emailLower.includes("athaporn@htechnology.com");
 
     if (!isSuperAdmin) {
       return NextResponse.json(

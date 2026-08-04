@@ -354,7 +354,7 @@ export default function PartsCatalogPage() {
       <div className="mt-6 text-xs text-slate-400 text-center font-medium">
         {lang === "th" ? "ที่มาข้อมูลราคากลางอ้างอิง: " : "Price Reference Source: "}
         <a href="https://uklang.com/repair-costs" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-extrabold hover:underline">
-          สมาคมอู่กลางการประกันภัย & ฐานข้อมูลราคากลางบริษัท เทคทันใจ อินโนเวชั่น จำกัด
+          สมาคมอู่กลางการประกันภัย & ฐานข้อมูลราคากลางบริษัท H TECHNOLOGY AND SERVICES COMPANY LIMITED
         </a>
       </div>
     </div>

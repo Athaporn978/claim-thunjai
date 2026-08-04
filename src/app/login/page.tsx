@@ -9,7 +9,7 @@ export default function LoginPage() {
   const { lang, setLang } = useLang();
   const router = useRouter();
 
-  const [email, setEmail] = useState("athaporn@techthunjai.com");
+  const [email, setEmail] = useState("athaporn@htechnology.com");
   const [password, setPassword] = useState("password123");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,10 +56,8 @@ export default function LoginPage() {
       {/* Top Navbar */}
       <header className="p-6 flex items-center justify-between z-10 max-w-7xl mx-auto w-full">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-full bg-[#0071e3] flex items-center justify-center shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="currentColor">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
+          <div className="w-10 h-10 rounded-full overflow-hidden shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
+            <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-extrabold text-xl tracking-tight text-[#1d1d1f] group-hover:text-[#0071e3] transition">
@@ -114,7 +112,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("admin@techthunjai.com");
+                  setEmail("admin@htechnology.com");
                   setPassword("123456");
                 }}
                 className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-slate-200 hover:border-[#0071e3] hover:bg-sky-50/50 transition cursor-pointer text-left group"
@@ -126,7 +124,7 @@ export default function LoginPage() {
                       Super Admin (เห็นทุกสาขา)
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono">
-                      admin@techthunjai.com • Pass: 123456
+                      admin@htechnology.com • Pass: 123456
                     </div>
                   </div>
                 </div>
@@ -139,7 +137,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("somchai@techthunjai.com");
+                  setEmail("somchai@htechnology.com");
                   setPassword("123456");
                 }}
                 className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-slate-200 hover:border-[#0071e3] hover:bg-sky-50/50 transition cursor-pointer text-left group"
@@ -151,7 +149,7 @@ export default function LoginPage() {
                       เจ้าหน้าที่คุมราคา (สาขาลาดพร้าว)
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono">
-                      somchai@techthunjai.com • Pass: 123456
+                      somchai@htechnology.com • Pass: 123456
                     </div>
                   </div>
                 </div>
@@ -164,7 +162,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("kanya@techthunjai.com");
+                  setEmail("kanya@htechnology.com");
                   setPassword("123456");
                 }}
                 className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-slate-200 hover:border-[#0071e3] hover:bg-sky-50/50 transition cursor-pointer text-left group"
@@ -176,7 +174,7 @@ export default function LoginPage() {
                       เจ้าหน้าที่คุมราคา (สาขาเชียงใหม่)
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono">
-                      kanya@techthunjai.com • Pass: 123456
+                      kanya@htechnology.com • Pass: 123456
                     </div>
                   </div>
                 </div>
@@ -189,7 +187,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("supervisor_latphrao@techthunjai.com");
+                  setEmail("supervisor_latphrao@htechnology.com");
                   setPassword("123456");
                 }}
                 className="flex items-center justify-between px-3 py-2 bg-amber-50/60 rounded-xl border border-amber-200 hover:border-amber-500 hover:bg-amber-100/60 transition cursor-pointer text-left group"
@@ -201,7 +199,7 @@ export default function LoginPage() {
                       หัวหน้าคุมราคา / Supervisor (สาขาลาดพร้าว)
                     </div>
                     <div className="text-[10px] text-amber-700 font-mono">
-                      supervisor_latphrao@techthunjai.com • Pass: 123456
+                      supervisor_latphrao@htechnology.com • Pass: 123456
                     </div>
                   </div>
                 </div>
@@ -214,7 +212,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("supervisor_chiangmai@techthunjai.com");
+                  setEmail("supervisor_chiangmai@htechnology.com");
                   setPassword("123456");
                 }}
                 className="flex items-center justify-between px-3 py-2 bg-amber-50/60 rounded-xl border border-amber-200 hover:border-amber-500 hover:bg-amber-100/60 transition cursor-pointer text-left group"
@@ -226,7 +224,7 @@ export default function LoginPage() {
                       หัวหน้าคุมราคา / Supervisor (สาขาเชียงใหม่)
                     </div>
                     <div className="text-[10px] text-amber-700 font-mono">
-                      supervisor_chiangmai@techthunjai.com • Pass: 123456
+                      supervisor_chiangmai@htechnology.com • Pass: 123456
                     </div>
                   </div>
                 </div>
@@ -261,7 +259,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="athaporn@techthunjai.com"
+                placeholder="athaporn@htechnology.com"
                 required
                 className="w-full px-4 py-3 rounded-xl bg-white border border-sky-200 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20 transition font-mono font-bold"
               />
@@ -317,22 +315,8 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          <div className="pt-2 text-center border-t border-sky-100">
-            <span className="text-xs text-slate-500 font-semibold block">
-              © 2026 บริษัท เทคทันใจ อินโนเวชั่น จำกัด
-            </span>
-            <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
-              (TECHTHUNJAI INNOVATION CO., LTD.)
-            </span>
-          </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="py-4 text-center text-xs text-slate-500 z-10">
-        © 2026 TECHTHUNJAI INNOVATION CO., LTD. All rights reserved.
-      </footer>
     </div>
   );
 }

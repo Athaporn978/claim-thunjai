@@ -34,8 +34,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       const isSuperAdmin =
         roleName.includes("super") ||
         roleName.includes("admin") ||
-        email.includes("athaporn@techthunjai.com") ||
-        email.includes("admin@techthunjai.com");
+        email.includes("athaporn@htechnology.com") ||
+        email.includes("admin@htechnology.com");
 
       // Route Protection Guard: Restrict /admin/* and /parts-catalog/import to Super Admin only
       const isRestrictedPath = pathname?.startsWith("/admin") || pathname?.startsWith("/parts-catalog/import");

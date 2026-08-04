@@ -87,7 +87,7 @@ export default function BulkPriceImportPage() {
   // User Profile
   const [userProfile, setUserProfile] = useState({
     name: "อรรถ ทดสอบ",
-    email: "athaporn@techthunjai.com",
+    email: "athaporn@htechnology.com",
     role: "Super Administrator",
   });
 
@@ -112,8 +112,8 @@ export default function BulkPriceImportPage() {
   const isSuperAdmin =
     userProfile.role.toLowerCase().includes("super") ||
     userProfile.role.toLowerCase().includes("admin") ||
-    userProfile.email.toLowerCase().includes("admin@techthunjai.com") ||
-    userProfile.email.toLowerCase().includes("athaporn@techthunjai.com");
+    userProfile.email.toLowerCase().includes("admin@htechnology.com") ||
+    userProfile.email.toLowerCase().includes("athaporn@htechnology.com");
 
   const loadAuditLogs = () => {
     setLoadingLogs(true);

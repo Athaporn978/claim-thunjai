@@ -209,7 +209,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {/* Card 1: Email */}
             <div className="bg-white/90 rounded-3xl p-6 text-center border border-sky-100 shadow-xl shadow-sky-100/80 hover:border-[#0071e3] hover:-translate-y-2 transition-all duration-300 group cursor-pointer">
               <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 text-3xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-[#0071e3] group-hover:text-white transition-all duration-300">
@@ -217,42 +217,20 @@ export default function Home() {
               </div>
               <h3 className="font-extrabold text-base text-[#1d1d1f] mb-1">{lang === "th" ? "อีเมลติดต่อ" : "Email Us"}</h3>
               <p className="text-[11px] text-slate-500 mb-3">{lang === "th" ? "ตอบกลับภายใน 24 ชม." : "Response within 24 hrs"}</p>
-              <a href="mailto:athaporn@techthunjai.com" className="text-xs font-extrabold text-[#0071e3] hover:underline truncate block">
-                athaporn@techthunjai.com
+              <a href="mailto:athaporn@htechnology.com" className="text-xs font-extrabold text-[#0071e3] hover:underline truncate block">
+                athaporn@htechnology.com
               </a>
             </div>
 
-            {/* Card 2: Phone */}
-            <div className="bg-white/90 rounded-3xl p-6 text-center border border-sky-100 shadow-xl shadow-sky-100/80 hover:border-[#0071e3] hover:-translate-y-2 transition-all duration-300 group cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 text-3xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-[#0071e3] group-hover:text-white transition-all duration-300">
-                📞
-              </div>
-              <h3 className="font-extrabold text-base text-[#1d1d1f] mb-1">{lang === "th" ? "โทรศัพท์" : "Phone Call"}</h3>
-              <p className="text-[11px] text-slate-500 mb-3">{lang === "th" ? "จันทร์ - ศุกร์ 08:30 - 17:30" : "Mon - Fri 08:30 - 17:30"}</p>
-              <a href="tel:0658828333" className="text-xs font-extrabold text-[#1d1d1f] hover:text-[#0071e3] transition">
-                065-882-8333
-              </a>
-            </div>
-
-            {/* Card 3: Line OA */}
-            <div className="bg-white/90 rounded-3xl p-6 text-center border border-sky-100 shadow-xl shadow-sky-100/80 hover:border-emerald-400 hover:-translate-y-2 transition-all duration-300 group cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 text-3xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-300">
-                💬
-              </div>
-              <h3 className="font-extrabold text-base text-[#1d1d1f] mb-1">{lang === "th" ? "Line Official" : "Line Official"}</h3>
-              <p className="text-[11px] text-slate-500 mb-3">{lang === "th" ? "แชทปรึกษาทีมงาน" : "Direct Support"}</p>
-              <span className="text-xs font-extrabold text-emerald-600 font-mono">@techthunjai</span>
-            </div>
-
-            {/* Card 4: Company Info */}
+            {/* Card 2: Company Info */}
             <div className="bg-white/90 rounded-3xl p-6 text-center border border-sky-100 shadow-xl shadow-sky-100/80 hover:border-purple-400 hover:-translate-y-2 transition-all duration-300 group cursor-pointer">
               <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 text-3xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white transition-all duration-300">
                 🏢
               </div>
               <h3 className="font-extrabold text-base text-[#1d1d1f] mb-1">{lang === "th" ? "บริษัทผู้พัฒนา" : "Developer"}</h3>
-              <p className="text-[11px] text-slate-500 mb-2">TECHTHUNJAI</p>
+              <p className="text-[11px] text-slate-500 mb-2">H TECHNOLOGY</p>
               <span className="text-[11px] text-slate-700 font-bold block leading-tight">
-                {lang === "th" ? "บริษัท เทคทันใจ อินโนเวชั่น จำกัด" : "TECHTHUNJAI INNOVATION CO., LTD."}
+                H TECHNOLOGY AND SERVICES COMPANY LIMITED
               </span>
             </div>
           </div>
@@ -265,11 +243,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-sky-100 text-slate-500 text-xs py-8 text-center">
-        {t.footer}
-      </footer>
     </div>
   );
 }

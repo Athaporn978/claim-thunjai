@@ -63,8 +63,8 @@ export default function ReportsPageLuxury() {
           const email = String(u.email || "").toLowerCase();
 
           const isSuperAdmin =
-            email === "athaporn@techthunjai.com" ||
-            email === "admin@techthunjai.com" ||
+            email === "athaporn@htechnology.com" ||
+            email === "admin@htechnology.com" ||
             roleName === "super administrator" ||
             roleName === "admin";
 
@@ -171,7 +171,7 @@ export default function ReportsPageLuxury() {
         const isBranchMatch =
           qb === userBranch ||
           (Boolean(normUserB) && Boolean(normRowB) && (normRowB.includes(normUserB) || normUserB.includes(normRowB)));
-        const isNotAdminCase = (q as any).createdByEmail !== "admin@techthunjai.com";
+        const isNotAdminCase = (q as any).createdByEmail !== "admin@htechnology.com";
         if (!isBranchMatch || !isNotAdminCase) return false;
       } else if (selectedBranches.length > 0) {
         const matchSel = selectedBranches.some((sb) => {

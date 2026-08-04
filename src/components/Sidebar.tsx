@@ -55,8 +55,8 @@ export function Sidebar() {
     Boolean(currentUser) &&
     ((currentUser?.roleName || "").toLowerCase().includes("super administrator") ||
       (currentUser?.roleName || "").toLowerCase() === "super admin" ||
-      (currentUser?.email || "").toLowerCase().includes("athaporn@techthunjai.com") ||
-      (currentUser?.email || "").toLowerCase().includes("admin@techthunjai.com"));
+      (currentUser?.email || "").toLowerCase().includes("athaporn@htechnology.com") ||
+      (currentUser?.email || "").toLowerCase().includes("admin@htechnology.com"));
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
@@ -254,10 +254,8 @@ export function Sidebar() {
       {/* Brand Header & Toggle */}
       <div className="p-4 border-b border-[#152243] flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 truncate">
-          <div className="w-9 h-9 rounded-xl bg-[#2563eb] flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-blue-600/30 shrink-0">
+            <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col leading-tight truncate">

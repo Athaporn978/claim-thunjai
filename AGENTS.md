@@ -4,13 +4,18 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Company Information (บริษัท เทคทันใจ อินโนเวชั่น จำกัด)
-- **ชื่อภาษาไทย**: บริษัท เทคทันใจ อินโนเวชั่น จำกัด
-- **ชื่อภาษาอังกฤษ**: TECHTHUNJAI INNOVATION CO., LTD.
-- **Line Official (Line OA)**: `@techthunjai`
-- **เบอร์โทรศัพท์**: `065-882-8333`
-- **Email**: `athaporn@techthunjai.com`
-- **Copyright Footer**: `© 2026 บริษัท เทคทันใจ อินโนเวชั่น จำกัด (TECHTHUNJAI INNOVATION CO., LTD.). All rights reserved.`
+# Brand Displayed on Website (แบรนด์ที่แสดงบนหน้าเว็บ)
+- **ชื่อเต็ม**: H TECHNOLOGY AND SERVICES COMPANY LIMITED
+- **ชื่อย่อ**: H TECHNOLOGY
+- **โดเมนอีเมล (ใช้ใน logic ล็อกอิน/สิทธิ์แอดมิน + บัญชีจริงใน DB)**: `@htechnology.com`
+- **Line OA / เบอร์โทร / ลิงก์ติดต่อ**: ยังไม่มีข้อมูลใหม่ — ซ่อน/เอาออกจากหน้าเว็บไปก่อน จนกว่าจะได้ข้อมูลจริงของ H Technology
+- **Copyright Footer**: **ไม่แสดงบนหน้าเว็บเด็ดขาด** ไม่ว่าจะเป็นชื่อ TechThunJai หรือ H Technology (ดูเหตุผลที่หัวข้อ Copyright Ownership ด้านล่าง)
+- **โลโก้**: ใช้ไฟล์ `public/logo/Htech_logo.webp`
+
+# Copyright Ownership (ข้อมูลภายใน — ห้ามเผยแพร่บนหน้าเว็บ Public)
+- **ลิขสิทธิ์ Source Code ทั้งหมดของระบบนี้ยังคงเป็นของบริษัท เทคทันใจ อินโนเวชั่น จำกัด (TechThunJai Innovation CO., LTD.) 100%**
+- ผู้ใช้ (เจ้าของลิขสิทธิ์) นำระบบนี้ไปขายต่อในนามแบรนด์ H Technology ให้ลูกค้าปลายทางแบบ B2B2B ภายใต้สัญญาระหว่าง TechThunJai และ H Technology โดยไม่เปิดเผยความเป็นเจ้าของ TechThunJai ต่อสาธารณะ
+- **ห้ามลบหรือแก้ไขข้อความในหัวข้อนี้เด็ดขาด** แม้จะมีการแก้ไข/เปลี่ยนแบรนด์ที่แสดงผลบนเว็บในอนาคตก็ตาม เพราะเป็นบันทึกสิทธิ์ความเป็นเจ้าของที่แท้จริงของระบบ
 
 # Strict UI/UX Design Rules (กฎเหล็กด้านดีไซน์และโทนสี)
 - **ห้ามใช้ปุ่ม, แบดจ์, ช่องกรอก, หรือแถบเครื่องมือที่เป็นสีดำเข้ม (`bg-slate-900`, `bg-black`, `bg-slate-800`) โดยเด็ดขาด** (ผู้ใช้ไม่ชอบสีดำ)
@@ -37,6 +42,23 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ⏳ **การใช้ Smart Flexible Item Parser (ปรับปรุงตัวอ่าน PDF ภาษาไทย)**:
   - *สถานะ*: ⏳ **รอผู้ใช้ทดสอบและยืนยันผล (Pending User Verification)**
   - *รายละเอียด*: ปรับปรุงการถอดข้อความภาษาไทย (ชื่อลูกค้า, ศูนย์ซ่อม, ยี่ห้อ/รุ่น) และถอดตารางรายการซ่อมที่ยืดหยุ่นโดยไม่ใช้ Mock (ยังต้องรอผู้ใช้อนุมัติและทดสอบจริง)
+
+# Core Business Logic: Price Matching (Logic การจับคู่ราคาค่าแรง & อะไหล่)
+- **ค่าแรง (Labor) — มีการ match อัตโนมัติกับราคากลาง**: ใช้ `src/app/api/extract-quote/route.ts` (เริ่มบรรทัด ~314)
+  1. ตรวจคำสำคัญจาก `CORE_BODY_KEYWORDS` ก่อน ถ้าไม่เจอจะตัดคำกริยานำหน้า (เคาะ/พ่นสี/เปลี่ยน/ถอดประกอบ) ด้วย regex เพื่อดึง keyword
+  2. `detectSeverityTier()` เดาระดับความเสียหายจากคำ: "เปลี่ยน"→replace, "เคาะ"→severe, "พ่นสี/ประกอบ"→moderate, "ขัด/เบา"→minor (default = moderate)
+  3. ค้นหาใน `RepairPrice` แบบ progressive-relaxation: (keyword+vehicleType+size ตรงหมด) → (keyword+vehicleType) → (keyword อย่างเดียว)
+  4. **เป็น exact/substring matching (`contains`) เท่านั้น ไม่มี Fuzzy Matching หรือ Levenshtein Distance**
+- **ค่าอะไหล่ (Parts) — ยังไม่มีการ match อัตโนมัติ (GAP ที่ต้องระวังเวลาพูดกับลูกค้า/เขียนเอกสาร)**:
+  - รายการ `itemType === "part"` **ไม่ query ตาราง `PartCatalogPrice` เลยตอนสร้างใบเสนอราคา** → `standardPrice` ถูกตั้งเท่ากับราคาที่อู่เสนอมาโดยตรง (ไม่มีการเทียบราคากลาง)
+  - `PartCatalogPrice` ถูกใช้แค่ตอนแอดมิน import ข้อมูล (`src/app/api/parts-catalog/import/route.ts`) ยังไม่เชื่อมกับ flow เทียบราคาจริง
+  - **ห้ามเขียนในเอกสารเสนอราคา/สื่อการตลาดว่าอะไหล่มีการ auto-match ราคากลางแล้ว** จนกว่าจะพัฒนาฟีเจอร์นี้จริง
+- **สูตรคำนวณ "ราคาควบคุม" (Controlled Price)**: พบใน `src/app/quotation/new/page.tsx` บรรทัด 414
+  ```
+  controlled = (standardPrice != null && standardPrice < quotedPrice) ? standardPrice : quotedPrice
+  ```
+  คือ ถ้ามีราคากลางและถูกกว่าราคาที่อู่เสนอ → ใช้ราคากลาง (ลดราคาลง) / ถ้าไม่มีราคากลางหรือราคากลางแพงกว่า/เท่ากับ → ใช้ราคาที่อู่เสนอตามจริง (ระบบไม่มีทางปรับราคาขึ้นเกินที่อู่เสนอ) ผู้ใช้ override เองได้ผ่าน `ItemsTable.tsx` หรือค้นหาราคากลางเองผ่าน `StandardPricePicker.tsx`
+  - ผลรวม (`totalQuoted`, `totalControlled`, `totalSaving`, `savingPct`) คำนวณใน `src/lib/quotation.ts` บรรทัด 59–73 โดยไม่มี business rule เพิ่มเติมนอกจากที่ตั้งค่า `controlledUnit` ไว้แล้ว
 
 # Strict Security & File Storage Rules (กฎเหล็กความปลอดภัยและการจัดเก็บไฟล์)
 - **ห้ามวางไฟล์ข้อมูล ฐานข้อมูล SQLite (`.db`), ไฟล์ Excel (`.xlsx`), หรือไฟล์ JSON ข้อมูลธุรกิจในโฟลเดอร์ `public/` เด็ดขาด**: ป้องกันการถูกแฮก การแอบสแกนดึงข้อมูล หรือการแอบดาวน์โหลดผ่านลิงก์ตรง (Direct Link Vulnerability)
@@ -79,4 +101,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
 9. **🛡️ Block Direct Excel Downloads & Clean Legacy Files**:
    - เพิ่มบล็อกความปลอดภัยใน Next.js Config (`next.config.ts`) ให้ Redirect การเรียกใช้ไฟล์ `.xlsx`, `.xls`, `.csv`, `.db` ตรงๆ จาก URL ทั้งหมดไปที่ 404 Not Found 100%
    - สั่งลบไฟล์ส่วนเกินและไฟล์ขยะประเภท Excel ทั้งหมดในโฟลเดอร์ `/var/www/demo-claim/public/` บนเครื่อง VPS พร้อม Deploy และ Rebuild เปิดใช้งานจริงเรียบร้อยแล้ว
+10. **📄 CEO Proposal Word Document (Claim-Thunjai)**:
+    - สร้างสคริปต์ `scripts/Claude_generate_proposal.py` (python-docx) สร้างไฟล์เสนอราคาระดับผู้บริหาร ฟอนต์ TH Sarabun New 16pt โทนสีน้ำเงินพรีเมียม พร้อมสารบัญที่มีเลขหน้าถูกต้อง 100% (ตรวจสอบด้วยการ render เป็น PDF ผ่าน `soffice` + `pdfplumber` ทุกครั้งที่แก้ layout)
+    - เอกสารล่าสุด (11 หน้า) นำเสนอ H Technology CO., LTD. วันที่ 4 สิงหาคม 2569 ครอบคลุม Modules/Features, System Architecture (Anthropic Claude API เท่านั้น — **ไม่มี Gemini/PostgreSQL ในระบบจริง**), Tech Stack, และราคา Pay-Per-Completed-Transaction (Starter 30 / Growth 27 / Enterprise 25 / Strategic Partner 22 บาทต่อเคส)
+    - ไฟล์ผลลัพธ์: `data/Claude_Proposal_Claim_Thunjai.docx` (เก็บนอก `public/` ตามกฎความปลอดภัย)
+    - **บทเรียน**: เดิมมีสคริปต์ `scripts/generate_proposal_docx.py` ที่ระบุ API ผิด (อ้าง Gemini/PostgreSQL ที่ไม่มีจริงในระบบ) — ห้ามใช้เป็นต้นแบบซ้ำ ให้ยึดโค้ดจริงเป็นหลักเสมอเวลาระบุ Stack/API ในเอกสารการตลาด
+11. **🏷️ Rebrand หน้าเว็บทั้งหมดเป็น H Technology (B2B2B White-label)**:
+    - เปลี่ยนข้อความแบรนด์ทุกจุดที่แสดงผลบนหน้าเว็บ (67 จุดเดิม ใน 21 ไฟล์) จาก "TechThunJai/เทคทันใจ" → "H TECHNOLOGY AND SERVICES COMPANY LIMITED" (ชื่อเต็ม) / "H TECHNOLOGY" (ชื่อย่อ) ครอบคลุม: หน้าแรก, หน้า login, parts-catalog, mock insurer name, i18n.ts
+    - เปลี่ยนโดเมนอีเมล hardcode ในทุก logic ล็อกอิน/สิทธิ์แอดมิน (`login/route.ts`, `PortalLayout.tsx`, `Sidebar.tsx`, `quotations/*`, `reports/*`, `admin/*`, `parts-catalog/import/*`) จาก `@techthunjai.com` → `@htechnology.com`
+    - **อัปเดตฐานข้อมูลจริง `dev.db`** (ตาราง `Employee`, `Quotation.createdByEmail`, `SystemAuditLog.details/performerName`, `Insurer.name/nameTh`) ให้ตรงกับโดเมนใหม่ พร้อม backup ไฟล์ก่อนแก้ (`dev.db.bak-<timestamp>`) — ยืนยันด้วยการ login จริงผ่าน API หลังแก้แล้วใช้งานได้ปกติ 100%
+    - อัปเดต `scripts/seed-mock-data.mjs` ให้ seed ด้วยโดเมนใหม่ด้วย ป้องกัน regression หากมีการ reseed ฐานข้อมูลในอนาคต
+    - **ลบ Copyright footer ออกจากทุกหน้าเว็บทั้งหมด** (ไม่แสดงทั้งชื่อ TechThunJai และ H Technology) และเอา Line OA/เบอร์โทร/ลิงก์ `techthunjai.com` ออกจากหน้าแรกและ Demo Bar เนื่องจากยังไม่มีข้อมูลติดต่อใหม่ของ H Technology
+    - แทนที่ไอคอนโลโก้ตัวอักษร (SVG รูปสามเหลี่ยม) ด้วยไฟล์ภาพจริง `public/logo/Htech_logo.webp` ใน 4 จุด: `Header.tsx`, `Sidebar.tsx`, `login/page.tsx`, ใบรายงานพิมพ์ `quotations/[id]/page.tsx`
+    - **สิ่งที่จงใจไม่แตะ (Out of Scope)**: ชื่อ Product "ClaimThunJai/ClaimThunJai AI" (ยังคงไว้ เพราะเป็นชื่อสินค้า ไม่ใช่ชื่อบริษัท), ไฟล์ `scripts/generate_proposal_docx.py` และ `scripts/Claude_generate_proposal.py` (เป็นเอกสารเสนอราคาที่ TechThunJai ใช้ติดต่อขายให้ H Technology เอง — สลับข้อมูลผิดจะทำให้เอกสารความหมายผิด), URL Production `demo-claim.techthunjai.com` ในหัวข้อ VPS (เป็นโดเมน Infra จริงที่ยังไม่ได้เปลี่ยน DNS)
+    - **บทเรียน**: ต้องตรวจข้อมูลจริงในฐานข้อมูล (`dev.db` ที่ root ของโปรเจกต์ ไม่ใช่ `prisma/dev.db` ที่เป็นไฟล์ว่างเก่า) ควบคู่กับโค้ดเสมอเวลา rebrand เพราะ RBAC logic เทียบอีเมลกับค่าที่บันทึกจริงใน DB ถ้าแก้แค่โค้ดแต่ไม่แก้ข้อมูล จะทำให้สิทธิ์แอดมิน/การกรองสาขาใช้งานไม่ได้ทันที
 

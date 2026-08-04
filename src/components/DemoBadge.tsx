@@ -120,25 +120,6 @@ export default function DemoBadge() {
           ? "DEMO — FULL ACCESS · ทดลองได้เต็มที่ 1 ชม."
           : "คุณกำลังดูระบบตัวอย่าง — สนใจสั่งทำระบบของคุณเอง?"}
       </span>
-      <a
-        href="https://techthunjai.com/#contact"
-        target="_blank"
-        rel="noopener"
-        style={{
-          padding: "6px 16px",
-          background: "rgba(255,255,255,.95)",
-          color: isFull ? "#047857" : "#991B1B",
-          borderRadius: 999,
-          textDecoration: "none",
-          fontSize: 12.5,
-          fontWeight: 800,
-          letterSpacing: 0.3,
-          whiteSpace: "nowrap",
-          boxShadow: "0 2px 8px rgba(0,0,0,.18)",
-        }}
-      >
-        สั่งทำ →
-      </a>
       <button
         onClick={() => setShow(false)}
         title="Hide"

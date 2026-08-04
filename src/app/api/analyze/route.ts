@@ -149,8 +149,8 @@ export async function POST(req: NextRequest) {
         firstInsurer = await prisma.insurer.create({
           data: {
             id: "default-insurer",
-            name: "บริษัท เทคทันใจ ประกันภัย จำกัด",
-            nameTh: "บริษัท เทคทันใจ ประกันภัย จำกัด",
+            name: "บริษัท H TECHNOLOGY ประกันภัย จำกัด",
+            nameTh: "บริษัท H TECHNOLOGY ประกันภัย จำกัด",
           },
         });
       }

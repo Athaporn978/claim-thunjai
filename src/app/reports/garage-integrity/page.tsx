@@ -43,8 +43,8 @@ export default function GarageIntegrityReportPage() {
           const role = (parsed.roleName || parsed.role?.name || parsed.role || "").toLowerCase();
           const email = (parsed.email || "").toLowerCase();
           return (
-            email === "athaporn@techthunjai.com" ||
-            email === "admin@techthunjai.com" ||
+            email === "athaporn@htechnology.com" ||
+            email === "admin@htechnology.com" ||
             role === "super administrator"
           );
         }
@@ -97,8 +97,8 @@ export default function GarageIntegrityReportPage() {
         const role = (parsed.roleName || parsed.role?.name || parsed.role || "").toLowerCase();
         const email = (parsed.email || "").toLowerCase();
         const isAdmin =
-          email === "athaporn@techthunjai.com" ||
-          email === "admin@techthunjai.com" ||
+          email === "athaporn@htechnology.com" ||
+          email === "admin@htechnology.com" ||
           role === "super administrator";
 
         setIsSuperAdmin(isAdmin);
@@ -125,7 +125,7 @@ export default function GarageIntegrityReportPage() {
       if (!isCompleted) return false;
 
       const qb = q.branch?.name || q.branchName || "";
-      const isNotAdminCase = (q as any).createdByEmail !== "admin@techthunjai.com";
+      const isNotAdminCase = (q as any).createdByEmail !== "admin@htechnology.com";
 
       if (!isSuperAdmin) {
         const currentB = userBranch || "";

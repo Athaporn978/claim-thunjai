@@ -70,8 +70,8 @@ export default function QuotationsPage() {
           const email = String(u.email || "").toLowerCase();
 
           const isSuperAdmin =
-            email === "athaporn@techthunjai.com" ||
-            email === "admin@techthunjai.com" ||
+            email === "athaporn@htechnology.com" ||
+            email === "admin@htechnology.com" ||
             roleName === "super administrator" ||
             roleName === "admin";
 
@@ -137,7 +137,7 @@ export default function QuotationsPage() {
             rowBranch === userBranch ||
             (Boolean(normUserB) && Boolean(normRowB) && (normRowB.includes(normUserB) || normUserB.includes(normRowB)))
           );
-        matchBranch = (isBranchMatch || rowCreatorEmail === (r as any).userEmail) && rowCreatorEmail !== "admin@techthunjai.com";
+        matchBranch = (isBranchMatch || rowCreatorEmail === (r as any).userEmail) && rowCreatorEmail !== "admin@htechnology.com";
       }
 
       return matchSearch && matchStart && matchEnd && matchStatus && matchBranch;

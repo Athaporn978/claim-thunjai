@@ -87,12 +87,12 @@ async function main() {
 
   // 3. Seed Sample Employees pointing to official system roles
   const employees = [
-    { code: "EMP-001", name: "ผู้บริหารระบบ (Super Admin)", email: "admin@techthunjai.com", username: "admin", roleId: adminRole.id, branchId: createdBranches[0].id },
-    { code: "EMP-002", name: "สมชาย ใจดี (คุมราคา-ลาดพร้าว)", email: "somchai@techthunjai.com", username: "staff_latphrao", roleId: controllerRole.id, branchId: createdBranches[0].id },
-    { code: "EMP-003", name: "กัญญา มีสุข (คุมราคา-เชียงใหม่)", email: "kanya@techthunjai.com", username: "staff_chiangmai", roleId: controllerRole.id, branchId: createdBranches[5].id },
-    { code: "EMP-004", name: "วิชัย สุขสันต์ (คุมราคา-ภูเก็ต)", email: "wichai@techthunjai.com", username: "staff_phuket", roleId: controllerRole.id, branchId: createdBranches[11].id },
-    { code: "EMP-005", name: "สมเกียรติ ยิ่งใหญ่ (หัวหน้าคุมราคา-ลาดพร้าว)", email: "supervisor_latphrao@techthunjai.com", username: "sup_latphrao", roleId: supervisorRole.id, branchId: createdBranches[0].id },
-    { code: "EMP-006", name: "นภา สว่างจิต (หัวหน้าคุมราคา-เชียงใหม่)", email: "supervisor_chiangmai@techthunjai.com", username: "sup_chiangmai", roleId: supervisorRole.id, branchId: createdBranches[5].id },
+    { code: "EMP-001", name: "ผู้บริหารระบบ (Super Admin)", email: "admin@htechnology.com", username: "admin", roleId: adminRole.id, branchId: createdBranches[0].id },
+    { code: "EMP-002", name: "สมชาย ใจดี (คุมราคา-ลาดพร้าว)", email: "somchai@htechnology.com", username: "staff_latphrao", roleId: controllerRole.id, branchId: createdBranches[0].id },
+    { code: "EMP-003", name: "กัญญา มีสุข (คุมราคา-เชียงใหม่)", email: "kanya@htechnology.com", username: "staff_chiangmai", roleId: controllerRole.id, branchId: createdBranches[5].id },
+    { code: "EMP-004", name: "วิชัย สุขสันต์ (คุมราคา-ภูเก็ต)", email: "wichai@htechnology.com", username: "staff_phuket", roleId: controllerRole.id, branchId: createdBranches[11].id },
+    { code: "EMP-005", name: "สมเกียรติ ยิ่งใหญ่ (หัวหน้าคุมราคา-ลาดพร้าว)", email: "supervisor_latphrao@htechnology.com", username: "sup_latphrao", roleId: supervisorRole.id, branchId: createdBranches[0].id },
+    { code: "EMP-006", name: "นภา สว่างจิต (หัวหน้าคุมราคา-เชียงใหม่)", email: "supervisor_chiangmai@htechnology.com", username: "sup_chiangmai", roleId: supervisorRole.id, branchId: createdBranches[5].id },
   ];
 
   for (const emp of employees) {
@@ -119,16 +119,16 @@ async function main() {
     // QT-2026-0002 -> Kanya (Chiang Mai)
     // All other cases (QT-2026-0001, QT-2026-0003, QT-2026-81796) -> Admin (HQ)
     let creatorName = "ผู้ดูแลระบบ (Super Admin)";
-    let creatorEmail = "admin@techthunjai.com";
+    let creatorEmail = "admin@htechnology.com";
     let assignedBranchId = null;
 
     if (q.quotationNo === "QT-2026-39448") {
       creatorName = "สมชาย ใจดี";
-      creatorEmail = "somchai@techthunjai.com";
+      creatorEmail = "somchai@htechnology.com";
       assignedBranchId = latPhraoBranch.id;
     } else if (q.quotationNo === "QT-2026-0002" || q.licensePlate?.includes("เชียงใหม่")) {
       creatorName = "กัญญา มีสุข";
-      creatorEmail = "kanya@techthunjai.com";
+      creatorEmail = "kanya@htechnology.com";
       assignedBranchId = chiangMaiBranch.id;
     }
 
