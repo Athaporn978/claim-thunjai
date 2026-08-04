@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   type QuotationItemInput,
   type ItemType,
@@ -29,75 +29,8 @@ export function ItemsTable({
   lang: "th" | "en";
 }) {
   const [pickerRow, setPickerRow] = useState<number | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [successModal, setSuccessModal] = useState<{ count: number } | null>(null);
-  const [invalidPdfModalMsg, setInvalidPdfModalMsg] = useState<string | null>(null);
-  const uploadRef = useRef<HTMLInputElement>(null);
   const rows = items.filter((i) => i.type === type);
   const st = sectionTotals(items, type);
-
-  const extractFromFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setExtracting(true);
-    try {
-      const accepted = Array.from(files).filter(
-        (f) => f.type.startsWith("image/") || f.type === "application/pdf",
-      );
-      const payload = await Promise.all(
-        accepted.map(
-          (f) =>
-            new Promise<{ data: string; mediaType: string }>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve({ data: (reader.result as string).split(",")[1], mediaType: f.type });
-              reader.readAsDataURL(f);
-            }),
-        ),
-      );
-      const res = await fetch("/api/extract-quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: payload }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error || !data.items) {
-        const errMsg =
-          data.message ||
-          (lang === "th"
-            ? "ไฟล์ PDF ที่คุณอัปโหลดไม่ใช่เอกสารใบเสนอราคาซ่อม หรือเอกสารประกันภัยรถยนต์ กรุณาตรวจสอบและอัปโหลดไฟล์ใหม่อีกครั้ง"
-            : "The uploaded PDF document is not a valid vehicle repair quotation or insurance claim document.");
-        setInvalidPdfModalMsg(errMsg);
-        return;
-      }
-      const extracted: QuotationItemInput[] = (data.items as { type: string; name: string; unitPrice: number; qty: number; standardPrice?: number | null }[]).map((i) => {
-        const itemType = (i.type === "labor" ? "labor" : "part") as ItemType;
-        const isLabor = itemType === "labor";
-        const stdPrice = isLabor ? (i.standardPrice ?? i.unitPrice) : null;
-        return {
-          type: itemType,
-          name: i.name,
-          quotedUnit: i.unitPrice,
-          quotedQty: i.qty,
-          controlledUnit: isLabor ? (stdPrice ?? i.unitPrice) : 0, // Labor auto-fills, Parts leave Blank (0)
-          controlledQty: i.qty,
-          standardPrice: stdPrice,
-          agreeWithStandard: isLabor,
-          note: isLabor ? (lang === "th" ? "อ้างอิงราคากลางสมาคมอู่กลางฯ" : "Reference standard price") : "",
-        };
-      });
-      if (extracted.length === 0) {
-        alert(lang === "th" ? "ไม่พบรายการในเอกสาร" : "No line items found.");
-        return;
-      }
-      onChange([...items, ...extracted]);
-      const n = extracted.length;
-      setSuccessModal({ count: n });
-    } catch {
-      alert(lang === "th" ? "เกิดข้อผิดพลาดในการประมวลผลใบเสนอราคา" : "Error processing quotation");
-    } finally {
-      setExtracting(false);
-      if (uploadRef.current) uploadRef.current.value = "";
-    }
-  };
 
   const updateRow = (rowIdx: number, patch: Partial<QuotationItemInput>) => {
     // map rowIdx (within this type) → index in full items array
@@ -156,33 +89,8 @@ export function ItemsTable({
               ⚡ {lang === "th" ? "คุมเท่าราคาเสนอทั้งหมด" : "Set all equal to quoted"}
             </button>
           )}
-          <input ref={uploadRef} type="file" accept="image/*,application/pdf,.pdf" multiple hidden onChange={(e) => extractFromFiles(e.target.files)} />
-          <button
-            onClick={() => {
-              if (uploadRef.current) {
-                uploadRef.current.value = "";
-                uploadRef.current.click();
-              }
-            }}
-            disabled={extracting}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--navy-900)] text-white text-sm font-semibold hover:bg-[var(--navy-800)] transition disabled:opacity-60"
-          >
-            {extracting ? (
-              <>
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10" strokeOpacity=".2" /><path d="M22 12a10 10 0 0 1-10 10" /></svg>
-                {lang === "th" ? "AI กำลังอ่าน…" : "AI reading…"}
-              </>
-            ) : (
-              <>📄 {lang === "th" ? "อัปโหลดใบเสนอราคา (AI กรอกให้)" : "Upload quote (AI fills)"}</>
-            )}
-          </button>
         </div>
       </div>
-      <p className="text-xs text-slate-400 mb-3">
-        {lang === "th"
-          ? "อัปโหลดรูปหรือไฟล์ PDF ใบเสนอราคาจากศูนย์ → AI อ่านและกรอกช่อง “ราคาเสนอ” ให้อัตโนมัติ (แยกค่าแรง/อะไหล่) แล้วตรวจสอบ + ปรับ “ราคาหลังคุม”"
-          : "Upload the center's quote (image or PDF) → AI extracts items into the “Quoted” columns (labor/parts auto-classified). Then review and set the “Controlled” price."}
-      </p>
       <div className="overflow-x-auto max-w-full border border-slate-200 rounded-2xl shadow-sm bg-white">
         <table className="w-full text-xs sm:text-sm min-w-[760px]">
           <thead>
@@ -419,37 +327,6 @@ export function ItemsTable({
           });
         }}
       />
-
-      {/* Custom Popup Modal for AI Quotation Extraction Success */}
-      {successModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center border border-slate-100 transform transition-all scale-100">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
-              ✨
-            </div>
-            <h3 className="text-xl font-bold text-[var(--navy-900)] mb-2">
-              {lang === "th" ? "ประมวลผลใบเสนอราคาสำเร็จ!" : "Quotation Processed Successfully!"}
-            </h3>
-            <p className="text-slate-700 text-sm font-medium mb-4">
-              {lang === "th"
-                ? `เพิ่ม ${successModal.count} รายการจากใบเสนอราคาแล้ว (ค่าแรง+อะไหล่)`
-                : `Added ${successModal.count} items from quotation (labor + parts)`}
-            </p>
-            
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 font-semibold mb-6 flex items-center justify-center gap-2">
-              <span className="text-base">⚠️</span>
-              <span>{lang === "th" ? "กรุณาตรวจสอบความถูกต้องอีกครั้ง" : "Please check accuracy again"}</span>
-            </div>
-
-            <button
-              onClick={() => setSuccessModal(null)}
-              className="btn-primary w-full justify-center !py-2.5 text-sm font-bold shadow-md hover:shadow-lg transition cursor-pointer"
-            >
-              {lang === "th" ? "เข้าใจแล้ว / ปิด" : "Got it / Close"}
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );
