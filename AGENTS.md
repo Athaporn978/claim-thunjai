@@ -59,3 +59,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - ซิงค์ฐานข้อมูล `dev.db` และแคตตาล็อกราคากลางค่าแรงซ่อม 504 รายการหลัก + อะไหล่ทุกยี่ห้อ พร้อมเปิดใช้งานจริงที่: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
 8. **🔒 Private Sample Excel Files (Data Directory Only)**:
    - สร้างไฟล์ตัวอย่าง Excel 2 ไฟล์ (`sample_parts_catalog_import.xlsx` และ `sample_repair_labor_import.xlsx`) จัดเก็บไว้ในโฟลเดอร์ปิด `data/` ในเครื่อง Local เท่านั้น และถอดออกจาก `public/` บนเว็บทั้งหมดเพื่อความปลอดภัยสูงสุด
+9. **🛡️ Block Direct Excel Downloads & Clean Legacy Files**:
+   - เพิ่มบล็อกความปลอดภัยใน Next.js Config (`next.config.ts`) ให้ Redirect การเรียกใช้ไฟล์ `.xlsx`, `.xls`, `.csv`, `.db` ตรงๆ จาก URL ทั้งหมดไปที่ 404 Not Found 100%
+   - สั่งลบไฟล์ส่วนเกินและไฟล์ขยะประเภท Excel ทั้งหมดในโฟลเดอร์ `/var/www/demo-claim/public/` บนเครื่อง VPS พร้อม Deploy และ Rebuild เปิดใช้งานจริงเรียบร้อยแล้ว
+
