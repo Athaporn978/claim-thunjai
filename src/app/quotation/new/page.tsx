@@ -95,15 +95,23 @@ function Wizard() {
   const [prefillNote, setPrefillNote] = useState<string>("");
   const skipGuard = useRef(false);
 
+  const resetWizardForm = useCallback(() => {
+    setForm(EMPTY);
+    setDirty(false);
+    setId(null);
+    setStep(0);
+    setPrefillNote("");
+    setUploadedFileSignatures([]);
+    setPendingReuploadData(null);
+    setDuplicateNoticeMsg(null);
+  }, []);
+
   // Reset form when opening a new quotation
   useEffect(() => {
     if (!editId && !fromIntake) {
-      setForm(EMPTY);
-      setDirty(false);
-      setId(null);
-      setPrefillNote("");
+      resetWizardForm();
     }
-  }, [editId, fromIntake]);
+  }, [editId, fromIntake, resetWizardForm]);
 
   // Load existing
   useEffect(() => {
@@ -291,6 +299,14 @@ function Wizard() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // Instant Pre-scan Reset: Wipe form and state clean immediately on new upload start
+    setForm(EMPTY);
+    setDirty(false);
+    setPrefillNote("");
+    setUploadedFileSignatures([]);
+    setPendingReuploadData(null);
+    setDuplicateNoticeMsg(null);
+
     setScanning(true);
     setScanProgress(15);
     setScanStepText(lang === "th" ? "กำลังอ่านไฟล์เอกสารใบเสนอราคา..." : "Reading quote document file...");
@@ -395,8 +411,6 @@ function Wizard() {
         const itemType = i.type === "labor" ? "labor" : "part";
         const quoted = Number(i.unitPrice) || 0;
         const std = i.standardPrice != null ? Number(i.standardPrice) : null;
-        // Fair Matching: controlledUnit = std ONLY IF std exists and std < quoted (overcharged).
-        // Otherwise, if quoted <= std or no std match, approve 100% (controlledUnit = quoted, Saving = 0.00).
         const controlled = (std != null && std < quoted) ? std : quoted;
         return {
           type: itemType,
@@ -413,8 +427,8 @@ function Wizard() {
       // Short delay so user sees 100% complete bar
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      setForm((prev) => ({
-        ...prev,
+      setForm({
+        ...EMPTY,
         customerName: meta.customerName || "",
         licensePlate: meta.licensePlate || "",
         vehicleCategory: category || "sedan_asia",
@@ -435,9 +449,9 @@ function Wizard() {
         discountPercent: meta.discountPercent ?? 15,
         discountAmount: (meta.discountAmount && Number(meta.discountAmount) > 0) ? Number(meta.discountAmount) : 0,
         includeVat: meta.includeVat ?? true,
-        photos: newPhotos.length > 0 ? newPhotos : (prev.photos || []),
-        items: formattedItems.length > 0 ? formattedItems : [],
-      }));
+        photos: newPhotos,
+        items: formattedItems,
+      });
 
       setDirty(true);
       setPrefillNote(
@@ -448,6 +462,12 @@ function Wizard() {
     } catch (err: any) {
       console.error("AI scan upload error:", err);
       clearInterval(progressTimer);
+      setStepError(
+        err?.message ||
+          (lang === "th"
+            ? "สแกนเอกสารไม่สำเร็จ กรุณาลองใหม่หรือกรอกข้อมูลด้วยตนเอง"
+            : "Document scan failed. Please try again or enter data manually.")
+      );
     } finally {
       setScanning(false);
       setScanProgress(0);
@@ -488,30 +508,28 @@ function Wizard() {
     }
 
     if (option === "replace") {
-      setForm((prev) => ({
-        ...prev,
-        customerName: meta.customerName || prev.customerName || "",
-        licensePlate: meta.licensePlate || prev.licensePlate || "",
-        vehicleBrand: matchedBrandName || prev.vehicleBrand || "",
-        vehicleModel: matchedModelName || prev.vehicleModel || "",
-        vehicleYear: meta.vehicleYear || prev.vehicleYear || 2022,
-        chassisNo: meta.chassisNo || prev.chassisNo || "",
-        color: meta.color || prev.color || "",
-        mileage: meta.mileage || prev.mileage || null,
-        insurerName: meta.insurerName || prev.insurerName || "",
-        claimNo: meta.claimNo || prev.claimNo || "",
-        policyNo: meta.policyNo || prev.policyNo || "",
-        policyType: meta.policyType || prev.policyType || "ชั้น 1",
-        centerName: meta.centerName || prev.centerName || "",
-        centerAddress: meta.centerAddress || prev.centerAddress || "",
-        centerContact: meta.centerContact || prev.centerContact || "",
+      setForm({
+        ...EMPTY,
+        customerName: meta.customerName || "",
+        licensePlate: meta.licensePlate || "",
+        vehicleBrand: matchedBrandName || "",
+        vehicleModel: matchedModelName || "",
+        vehicleYear: meta.vehicleYear || 2026,
+        chassisNo: meta.chassisNo || "",
+        color: meta.color || "",
+        mileage: meta.mileage || null,
+        insurerName: meta.insurerName || "",
+        claimNo: meta.claimNo || "",
+        policyNo: meta.policyNo || "",
+        policyType: meta.policyType || "ชั้น 1",
+        centerName: meta.centerName || "",
+        centerAddress: meta.centerAddress || "",
+        centerContact: meta.centerContact || "",
         items: extractedItems,
-      }));
+      });
     } else if (option === "append") {
       setForm((prev) => ({
         ...prev,
-        customerName: prev.customerName || meta.customerName || "",
-        licensePlate: prev.licensePlate || meta.licensePlate || "",
         items: [...prev.items, ...extractedItems],
       }));
     }
@@ -605,20 +623,47 @@ function Wizard() {
           </div>
         </div>
 
-        <label className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0071e3] hover:bg-blue-600 text-white text-xs sm:text-sm font-bold transition cursor-pointer shadow-md ${scanning ? "opacity-60 cursor-wait" : ""}`}>
-          {scanning ? (
-            <>
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>{lang === "th" ? "กำลังสแกนและกรอกข้อมูล..." : "Scanning & Auto-filling..."}</span>
-            </>
-          ) : (
-            <>
-              <span>📁</span>
-              <span>{lang === "th" ? "เลือกไฟล์ PDF / รูปภาพเพื่อสแกน" : "Select PDF / Images to Scan"}</span>
-            </>
+        <div className="flex items-center gap-2">
+          {dirty && (
+            <button
+              type="button"
+              onClick={resetWizardForm}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition cursor-pointer shadow-md"
+              title={lang === "th" ? "ล้างข้อมูลฟอร์มทั้งหมดเพื่อเริ่มสแกนใหม่" : "Reset form data for new scan"}
+            >
+              <span>🔄</span>
+              <span>{lang === "th" ? "ล้างข้อมูล / เริ่มสแกนใหม่" : "Reset / New Scan"}</span>
+            </button>
           )}
-          <input type="file" accept=".pdf,image/*" multiple onChange={handleAiScanUpload} disabled={scanning} className="hidden" />
-        </label>
+          <label
+            title={dirty ? (lang === "th" ? "กรุณากด 'ล้างข้อมูล / เริ่มสแกนใหม่' ก่อนสแกนไฟล์ใหม่" : "Please reset form before scanning a new file") : undefined}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-md ${
+              dirty || scanning
+                ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
+                : "bg-[#0071e3] hover:bg-blue-600 text-white cursor-pointer"
+            }`}
+          >
+            {scanning ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>{lang === "th" ? "กำลังสแกนและกรอกข้อมูล..." : "Scanning & Auto-filling..."}</span>
+              </>
+            ) : (
+              <>
+                <span>📁</span>
+                <span>{lang === "th" ? "เลือกไฟล์ PDF / รูปภาพเพื่อสแกน" : "Select PDF / Images to Scan"}</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              multiple
+              onChange={handleAiScanUpload}
+              disabled={scanning || dirty}
+              className="hidden"
+            />
+          </label>
+        </div>
       </div>
 
       {prefillNote && (

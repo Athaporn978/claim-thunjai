@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { estimateTotal } from "@/lib/priceLookup";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-3-5-sonnet-latest";
+const MODEL = "claude-sonnet-5";
 const CONCURRENCY = 4;
 const MAX_VISION_IMAGES = 6;
 

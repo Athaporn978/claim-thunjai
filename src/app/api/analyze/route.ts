@@ -9,7 +9,7 @@ export const maxDuration = 60;
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-const MODEL = "claude-3-5-sonnet-latest";
+const MODEL = "claude-sonnet-5";
 
 const SYSTEM_PROMPT = `You are an elite automotive damage assessor for an insurance company.
 You analyze photos of vehicles and detect damages with surgical precision.
@@ -120,36 +120,13 @@ export async function POST(req: NextRequest) {
         }
         return parsed;
       } catch (err) {
-        console.warn("Claude 3.5 Sonnet vision call notice, switching to Intelligent Vision Engine:", err);
-        
-        // Intelligent Auto-Damage Detection Rule Engine for Car Inspection Photos
-        const fallbackDamages = [
-          {
-            part: "Rear Bumper",
-            partTh: "กันชนหลัง",
-            severity: "minor" as const,
-            description: "Cosmetic paint scratch and scuff mark ~15cm on rear left bumper panel",
-            descriptionTh: "รอยขีดข่วนและรอยถลอก ~15ซม. บริเวณกันชนหลังซ้าย",
-            bbox: { x: 26, y: 64, w: 36, h: 20 },
-            confidence: 0.96,
-          },
-        ];
-
-        const isTargetPhoto = index === 0 || index === 1 || index === 2 || body.images.length === 1;
-        const damages = isTargetPhoto ? fallbackDamages : [];
-        const est = damages.length > 0
-          ? await estimateTotal(damages, { make: body.vehicleMake || "Škoda", model: body.vehicleModel || "Superb" })
-          : { items: [], totalLow: 0, totalHigh: 0, matchedCount: 0, totalCount: 0 };
-
-        const damagesWithPrice = damages.map((d, i) => ({ ...d, priceEstimate: est.items[i] }));
-
+        console.warn("Vision model call notice:", err);
         return {
-          vehicleMake: body.vehicleMake || "Škoda",
-          vehicleColor: "white",
-          angle: index === 0 ? "rear-left" : index === 1 ? "rear-left" : "rear",
-          overallSeverity: damages.length > 0 ? "minor" : "minor",
-          damages: damagesWithPrice,
-          totalEstimate: damages.length > 0 ? { low: est.totalLow, high: est.totalHigh, matchedCount: est.matchedCount, totalCount: est.totalCount } : undefined,
+          vehicleMake: body.vehicleMake || null,
+          vehicleColor: null,
+          angle: "other",
+          overallSeverity: "minor",
+          damages: [],
         };
       }
     }

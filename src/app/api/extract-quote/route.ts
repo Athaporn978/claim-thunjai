@@ -1,5 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { BRANDS } from "@/lib/carCatalog";
+import type Anthropic from "@anthropic-ai/sdk";
+
+// Resolve vehicleType + size from AI-extracted brand/model, same catalog the UI uses.
+function resolveVehicleTypeSize(brandRaw?: string, modelRaw?: string) {
+  const brand = (brandRaw || "").toLowerCase().trim();
+  const model = (modelRaw || "").toLowerCase().trim();
+  if (brand) {
+    const brandObj = BRANDS.find(
+      (b) => b.name.toLowerCase().includes(brand) || brand.includes(b.name.toLowerCase())
+    );
+    if (brandObj) {
+      const modelObj = brandObj.models.find(
+        (m) => model && (m.name.toLowerCase().includes(model) || model.includes(m.name.toLowerCase()))
+      );
+      if (modelObj) return { vehicleType: modelObj.vehicleType, size: modelObj.size };
+      if (brandObj.models.length > 0) {
+        return { vehicleType: brandObj.models[0].vehicleType, size: brandObj.models[0].size };
+      }
+    }
+  }
+  return { vehicleType: "sedan_asia", size: "B" };
+}
+
+// Guess repair-severity tier from keywords in the labor line-item name.
+function detectSeverityTier(name: string): "minor" | "moderate" | "severe" | "replace" {
+  if (name.includes("เปลี่ยน")) return "replace";
+  if (name.includes("เคาะ")) return "severe";
+  if (name.includes("พ่นสี") || name.includes("ประกอบ") || name.includes("ทำสี")) return "moderate";
+  if (name.includes("ขัด") || name.includes("เบา")) return "minor";
+  return "moderate";
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -35,9 +67,9 @@ export async function POST(req: NextRequest) {
               pdfTextExtracted = true;
 
               let customer =
-                text.match(/(?:ผู้เอาประกันภัย|ผู้เอาประกัน|ชื.*อลูกค้า|นามผู้รับบริการ|ชื่อลูกค้า|ผู้ขอนำรถ|คุณ)\s*[:\s\t]*([^\r\n\t]+)/i)?.[1]?.trim() ||
-                text.match(/(คุณ\s+[^\r\n\t]+|นาย\s+[^\r\n\t]+|นาง\s+[^\r\n\t]+|นางสาว\s+[^\r\n\t]+)/i)?.[1]?.trim() || "";
-              customer = customer.replace(/(?:เบอร์โทร|โทรศัพท์|โทร|ทะเบียน|เลขเคลม|ประกันภัย|ยี่ห้อ|รุ่น|ที่อยู่).*/i, "").trim();
+                text.match(/(?:ผู้เอาประกันภัย|ผู้เอาประกัน|ชื.*อลูกค้า|นามผู้รับบริการ|ชื่อลูกค้า|ผู้ขอนำรถ|ลูกค้า|คุณ)\s*[:\s\t]*([^\r\n\t]+)/i)?.[1]?.trim() ||
+                text.match(/((?:นาย|นาง|นางสาว|คุณ)\s*[ก-๙a-zA-Z]+(?:\s+[ก-๙a-zA-Z]+)+)/)?.[1]?.trim() || "";
+              customer = customer.replace(/(?:เบอร์โทร|โทรศัพท์|โทร|ทะเบียน|เลขเคลม|ประกันภัย|ยี่ห้อ|รุ่น|ที่อยู่|เลขประจำตัว).*/i, "").trim();
 
               let plate = text.match(/(?:ทะเบียนรถ|ทะเบียน)\s*[:\s\t]*([^\r\n\t]+)/i)?.[1]?.trim() || "";
               plate = plate.replace(/(?:ยี่ห้อ|รุ่น|สี|ปี|เลขตัวถัง|เลขเครื่อง).*/i, "").trim();
@@ -45,8 +77,29 @@ export async function POST(req: NextRequest) {
                 plate = text.match(/([0-9]?[ก-ฮ]{1,3}\s*[-]?\s*[0-9]{1,4}(?:\s*กทม|\s*กรุงเทพมหานคร|\s*[ก-ฮ]{2,})?)/)?.[1] || "";
               }
 
-              const brand = text.match(/NISSAN/i) ? "Nissan" : text.match(/HONDA/i) ? "Honda" : text.match(/ISUZU/i) ? "Isuzu" : text.match(/TOYOTA/i) ? "Toyota" : text.match(/MAZDA/i) ? "Mazda" : null;
-              const model = text.match(/ALMERA|BDYARG/i) ? "Almera" : text.match(/CITY/i) ? "City" : text.match(/CIVIC/i) ? "Civic" : text.match(/D-MAX/i) ? "D-Max" : text.match(/HILUX|REVO/i) ? "Hilux Revo" : null;
+              const brand = text.match(/HONDA|ฮอนด้า/i) ? "Honda" :
+                            text.match(/NISSAN|นิสสัน/i) ? "Nissan" :
+                            text.match(/TOYOTA|โตโยต้า/i) ? "Toyota" :
+                            text.match(/ISUZU|อีซูซุ/i) ? "Isuzu" :
+                            text.match(/MAZDA|มาสด้า/i) ? "Mazda" :
+                            text.match(/MG|เอ็มจี/i) ? "MG" :
+                            text.match(/BYD|บีวายดี/i) ? "BYD" :
+                            text.match(/BENZ|MERCEDES|เบนซ์/i) ? "Mercedes-Benz" :
+                            text.match(/BMW|บีเอ็ม/i) ? "BMW" :
+                            text.match(/FORD|ฟอร์ด/i) ? "Ford" :
+                            text.match(/MITSUBISHI|มิตซู/i) ? "Mitsubishi" : null;
+
+              const model = text.match(/ALMERA|อัลเมร่า|BDYARG/i) ? "Almera" :
+                             text.match(/CITY|ซิตี้/i) ? "City" :
+                             text.match(/CIVIC|ซีวิค/i) ? "Civic" :
+                             text.match(/D-MAX|ดีแมคซ์/i) ? "D-Max" :
+                             text.match(/HILUX|REVO|รีโว่/i) ? "Hilux Revo" :
+                             text.match(/CAMRY|แคมรี่/i) ? "Camry" :
+                             text.match(/ALTIS|อัลติส/i) ? "Corolla Altis" :
+                             text.match(/FORTUNER|ฟอร์จูนเนอร์/i) ? "Fortuner" :
+                             text.match(/HR-V|เอชอาร์วี/i) ? "HR-V" :
+                             text.match(/CR-V|ซีอาร์วี/i) ? "CR-V" :
+                             text.match(/ATTO|แอคโต้/i) ? "Atto 3" : null;
 
               const mileageStr = text.match(/(?:เลขไมล์|กม\.)\s*[:\s\t]*([\d,]+)/i)?.[1];
               const mileage = mileageStr ? Number(mileageStr.replace(/,/g, "")) : null;
@@ -70,32 +123,38 @@ export async function POST(req: NextRequest) {
 
               const center = text.match(/(บริษัท\s+[^\r\n\t]+จำกัด[^\r\n\t]*)/i)?.[1]?.trim();
 
+              const IGNORE_KEYWORDS = [
+                "บริษัท", "จำกัด", "โทรศัพท์", "โทรสาร", "โทร", "จังหวัด", "ตำบล", "อำเภอ", "แขวง", "เขต", "ถนน",
+                "ยี่ห้อ", "รุ่น", "ปี", "เลขตัวถัง", "ทะเบียน", "ประกันภัย", "เลขที่", "ใบเสนอราคา", "รวมเป็นเงิน",
+                "ส่วนลด", "ภาษี", "มูลค่ารวม", "จำนวนเงินรวม", "ผู้เอาประกัน", "ลูกค้า", "ผู้ขอนำรถ", "อนุมัติ",
+                "ตาราง", "หน้า", "ลำดับ", "ราคา/หน่วย", "ยอดรวม"
+              ];
+
               const lines = text.split("\n");
               const items: any[] = [];
               lines.forEach((l: string) => {
                 const lineStr = l.trim();
-                if (!lineStr || lineStr.includes("รวมเป็นเงิน") || lineStr.includes("ส่วนลด") || lineStr.includes("หมายเหตุ") || lineStr.includes("ภาษี") || lineStr.includes("จำนวนเงิน") || lineStr.includes("ใบเสนอราคา") || lineStr.includes("มูลค่ารวม")) return;
+                if (!lineStr) return;
 
-                const isLabor = lineStr.includes("เคาะ") || lineStr.includes("พ่นสี") || lineStr.includes("ซ่อม") || lineStr.includes("ถอด") || lineStr.includes("ยก") || lineStr.includes("ค่าแรง") || lineStr.includes("เปลี่ยน");
-                const itemType = isLabor ? "labor" : "part";
+                const isHeaderOrMeta = IGNORE_KEYWORDS.some((kw) => lineStr.includes(kw));
+                if (isHeaderOrMeta) return;
 
-                const m1 = lineStr.match(/^(?:\d+[\.\)]?\s+)?([^\d]+?)\s+(?:(\d+)\s+)?([\d,]+(?:\.\d{1,2})?)\s*$/);
-                if (m1) {
-                  const name = m1[1].trim();
-                  const qty = parseFloat(m1[2]) || 1;
-                  const price = parseFloat(m1[3].replace(/,/g, ""));
-                  if (name.length >= 2 && price > 0) {
-                    items.push({ type: itemType, name, qty, unitPrice: price });
-                    return;
-                  }
-                }
-
-                const m2 = lineStr.match(/^(.+?)\s+([\d,]+(?:\.\d{1,2})?)\s*$/);
-                if (m2) {
-                  const name = m2[1].replace(/^\d+[\.\)]?\s*/, "").trim();
-                  const price = parseFloat(m2[2].replace(/,/g, ""));
-                  if (name.length >= 2 && price > 0) {
-                    items.push({ type: itemType, name, qty: 1, unitPrice: price });
+                const priceMatch = lineStr.match(/([\d,]{2,}(?:\.\d{1,2})?)\s*$/);
+                if (priceMatch) {
+                  const rawPrice = parseFloat(priceMatch[1].replace(/,/g, ""));
+                  if (rawPrice >= 50) {
+                    let namePart = lineStr.substring(0, priceMatch.index).trim();
+                    namePart = namePart.replace(/^(?:\d+[\.\)]?\s*)+/, "").trim();
+                    let qty = 1;
+                    const qtyMatch = namePart.match(/\s+(\d+)\s*$/);
+                    if (qtyMatch) {
+                      qty = parseInt(qtyMatch[1]);
+                      namePart = namePart.substring(0, qtyMatch.index).trim();
+                    }
+                    if (namePart.length >= 2) {
+                      const isLabor = lineStr.includes("เคาะ") || lineStr.includes("พ่นสี") || lineStr.includes("ซ่อม") || lineStr.includes("ถอด") || lineStr.includes("ยก") || lineStr.includes("ค่าแรง") || lineStr.includes("เปลี่ยน");
+                      items.push({ type: isLabor ? "labor" : "part", name: namePart, qty, unitPrice: rawPrice });
+                    }
                   }
                 }
               });
@@ -125,7 +184,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Anthropic Claude 3.5 Sonnet Vision Extraction
+    // 2. Anthropic Claude Vision Extraction (if key set and model supported)
     const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
     if (ANTHROPIC_KEY && (!parsedResult.items || parsedResult.items.length === 0)) {
       try {
@@ -196,7 +255,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
 
         const response = await anthropic.messages.create(
           {
-            model: "claude-3-5-sonnet-latest",
+            model: "claude-sonnet-5",
             max_tokens: 4096,
             messages: [{ role: "user", content: contentParts }],
           },
@@ -207,7 +266,10 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
           }
         );
 
-        const respText = response.content?.[0]?.type === "text" ? response.content[0].text : "";
+        const respText = response.content
+          .filter((c): c is Anthropic.TextBlock => c.type === "text")
+          .map((c) => c.text)
+          .join("\n");
         let aiParsed: any = null;
         const firstBrace = respText.indexOf("{");
         const lastBrace = respText.lastIndexOf("}");
@@ -230,54 +292,18 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
       }
     }
 
-    // 3. Special Scanned Document Matching for Nissan Estimation Sheet & standard templates
-    let isNissanEstimationSheet = false;
-    for (const f of files) {
-      if (f.name && (f.name.includes("2") || f.name.toLowerCase().includes("nissan") || f.name.toLowerCase().includes("quote") || f.name.includes("ใบเสนอราคา"))) {
-        isNissanEstimationSheet = true;
-        break;
-      }
-    }
-
-    if ((!parsedResult.items || parsedResult.items.length === 0) && (pdfTextExtracted || isNissanEstimationSheet || files.length > 0)) {
-      // Nissan Siam Nissan Phichit Estimation Sheet (1QB-26060007 / Khun Namthip Thanwong)
-      parsedResult = {
-        customerName: parsedResult.customerName || "คุณน้ำทิพย์ ทันวงค์",
-        licensePlate: parsedResult.licensePlate || "2ขณ 2963 กทม",
-        vehicleBrand: parsedResult.vehicleBrand || "Nissan",
-        vehicleModel: parsedResult.vehicleModel || "Almera",
-        vehicleYear: 2026,
-        chassisNo: parsedResult.chassisNo || "MNTBAAN18Z0016529",
-        color: parsedResult.color || "KAD(GUN METALLIC)",
-        mileage: parsedResult.mileage || 185246,
-        insurerName: parsedResult.insurerName || "ทิพยประกันภัย",
-        claimNo: parsedResult.claimNo || "A03026V001241",
-        policyNo: parsedResult.policyNo || "11002-012-250066180",
-        policyType: "ชั้น 1",
-        centerName: parsedResult.centerName || "บริษัท สยามนิสสัน พิจิตร จำกัด",
-        centerAddress: parsedResult.centerAddress || "9/9 ถ.สระหลวง ต.ในเมือง อ.เมือง จ.พิจิตร 66000",
-        centerContact: parsedResult.centerContact || "061-4569000",
-        discountPercent: 15,
-        discountAmount: 2869.50,
-        items: [
-          { type: "labor", name: "เปลี่ยนพ่นสี กันชนหน้า", unitPrice: 4400, qty: 1 },
-          { type: "part", name: "กันชนหน้า N18T ( เจาะรู )", unitPrice: 3185, qty: 1 },
-          { type: "part", name: "แผงกันโคลนหน้าขวา N18T", unitPrice: 855, qty: 1 },
-          { type: "part", name: "แผงกันโคลน N18T (สั่งแยก P/N AD64TLLF คลิ๊ป)", unitPrice: 735, qty: 1 },
-          { type: "part", name: "ลูกรีเวท 4-8 ใหญ่", unitPrice: 200, qty: 1 },
-          { type: "part", name: "ชุดไฟตัดหมอกขวา", unitPrice: 6900, qty: 1 },
-          { type: "part", name: "เบ้าไฟตัดหมอกข้างขวา N18T", unitPrice: 570, qty: 1 },
-          { type: "part", name: "ถังฉีดน้ำล้างกระจก N18T", unitPrice: 1025, qty: 1 },
-          { type: "part", name: "แป้นยึดกันชนหน้าขวา N18T", unitPrice: 85, qty: 1 },
-          { type: "part", name: "แป้นยึดกันชนหน้าซ้าย N18T", unitPrice: 85, qty: 1 },
-          { type: "part", name: "คลิปล็อก", unitPrice: 105, qty: 4 },
-          { type: "part", name: "คลิ๊ป", unitPrice: 110, qty: 2 },
-          { type: "part", name: "คลิป", unitPrice: 30, qty: 15 },
-        ],
-      };
+    // 3. If neither pdf-parse nor AI could extract real repair items, fail explicitly.
+    // Never fabricate placeholder customer/vehicle/item data — see AGENTS.md lesson log.
+    if (!parsedResult.items || parsedResult.items.length === 0) {
+      return NextResponse.json(
+        { error: "ไม่สามารถอ่านรายการซ่อมจากเอกสารได้ กรุณาตรวจสอบคุณภาพไฟล์ หรือกรอกข้อมูลด้วยตนเอง" },
+        { status: 422 }
+      );
     }
 
     const rawItems = Array.isArray(parsedResult) ? parsedResult : parsedResult.items || [];
+
+    const { vehicleType, size } = resolveVehicleTypeSize(parsedResult.vehicleBrand, parsedResult.vehicleModel);
 
     const CORE_BODY_KEYWORDS = [
       "กันชนหน้า", "กันชนหลัง", "คานกันชน", "ฝากระโปรงหน้า", "ฝากระโปรงหลัง", "ฝาท้าย",
@@ -292,7 +318,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
           const uPrice = Number(i.unitPrice) || 0;
           const cleanName = String(i.name).trim();
           const itemType = i.type === "labor" ? "labor" : "part";
-          
+
           let stdPrice: number | null = null;
 
           if (itemType === "labor") {
@@ -313,13 +339,16 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
               }
 
               if (matchKw) {
-                const dbMatch = await prisma.repairPrice.findFirst({
-                  where: {
-                    partTh: { contains: matchKw },
-                  },
-                });
+                const tier = detectSeverityTier(cleanName);
+                // Prefer an exact vehicleType+size match; relax progressively so we
+                // still surface a plausible price instead of nothing.
+                const dbMatch =
+                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw }, vehicleType, size } })) ??
+                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw }, vehicleType } })) ??
+                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw } } }));
                 if (dbMatch) {
-                  stdPrice = dbMatch.moderate ?? dbMatch.minor ?? dbMatch.severe ?? dbMatch.replace ?? null;
+                  const tierValue = (dbMatch as unknown as Record<string, number | null>)[tier];
+                  stdPrice = tierValue ?? dbMatch.moderate ?? dbMatch.minor ?? dbMatch.severe ?? dbMatch.replace ?? null;
                 }
               }
             } catch {}

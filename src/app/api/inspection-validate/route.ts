@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-3-5-sonnet-latest";
+const MODEL = "claude-sonnet-5";
 
 type Img = { data: string; mediaType: string };
 type Body = {
