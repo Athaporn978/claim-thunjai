@@ -3,13 +3,14 @@ import sharp from "sharp";
 import { estimateTotal } from "@/lib/priceLookup";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-sonnet-5";
+const MODEL = "claude-opus-5";
 const CONCURRENCY = 4;
 const MAX_VISION_IMAGES = 6;
 
 const DAMAGE_PROMPT = `You are an elite automotive damage assessor for an insurance company.
 Inspect every body panel (Bumpers, Hood, Trunk Lid, Fenders, Doors, Mirrors) with surgical precision.
 YOU MUST DETECT EVEN SUBTLE COSMETIC SCRATCHES, PAINT SCUFFS, ABRASIONS, PAINT CHIPS, BLACK FRICTION MARKS, AND MINOR DENTS, especially on light-colored (white, silver, light gray) vehicle body panels. Label any scratch/scuff with severity: "minor".
+LEFT/RIGHT ORIENTATION: Determine "left" and "right" from the viewer's perspective looking AT the photo (as it appears on screen), NOT from the driver's seat. A part nearer the left edge of the image is the "left" part.
 
 For EACH image, identify every visible damage and return ONLY this JSON object (no fences):
 {
