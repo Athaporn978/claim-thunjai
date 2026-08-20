@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -256,24 +255,18 @@ Return ONLY valid JSON shape:
     if (parsed.damages && parsed.damages.length > 0) {
       flags.push({ severity: "warn", message: `AI ตรวจพบความเสียหายพรีเอ็กซิสติ้งบนตัวรถจำนวน ${parsed.damages.length} จุด` });
       
-      // Fetch prices from database to match
-      const dbPrices = await prisma.repairPrice.findMany();
-
+      // No vehicle brand/model is available at this stage (pre-inspection photo
+      // check only — see Body type above), so pricing can't be looked up here.
+      // See src/lib/priceLookup.ts for brand/model-aware pricing, used once a
+      // claim/quotation actually has vehicle info attached.
       for (const dmg of parsed.damages) {
-        // Try to match partTh with DB entries
-        const matched = dbPrices.find((p) => p.partTh === dmg.partTh);
         const item: DamageItem = {
           angle: dmg.angle,
           partTh: dmg.partTh,
           severity: dmg.severity,
           description: dmg.description,
           bbox: dmg.bbox,
-          price: matched ? {
-            minor: matched.minor,
-            moderate: matched.moderate,
-            severe: matched.severe,
-            replace: matched.replace
-          } : null
+          price: null,
         };
         damages.push(item);
       }

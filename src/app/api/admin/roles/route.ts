@@ -17,7 +17,7 @@ export async function GET() {
         data: [
           { code: "ROLE-ADMIN", name: "Super Administrator", description: "บทบาทสูงสุดสำหรับผู้ดูแลระบบ จัดการได้ทุกเมนู", permissions: JSON.stringify(["all"]) },
           { code: "ROLE-CONTROLLER", name: "เจ้าหน้าที่คุมราคา (Adjuster)", description: "บทบาทตรวจสอบ อนุมัติ และปรับราคาหลังคุมใบเสนอราคาซ่อม", permissions: JSON.stringify(["quotation_review", "catalog_view"]) },
-          { code: "ROLE-CENTER", name: "เจ้าหน้าที่ศูนย์บริการ/อู่", description: "บทบาทอัปโหลดเอกสารใบเสนอราคาและเสนอราคาซ่อม", permissions: JSON.stringify(["quotation_create", "intake_view"]) },
+          { code: "ROLE-CENTER", name: "เจ้าหน้าที่ศูนย์บริการ/อู่", description: "บทบาทอัปโหลดเอกสารใบเสนอราคาและเสนอราคาซ่อม", permissions: JSON.stringify(["quotation_create"]) },
           { code: "ROLE-VIEWER", name: "ผู้ดูรายงาน (Viewer)", description: "บทบาทเข้าดูรายงานและสรุปยอดประหยัด (Read Only)", permissions: JSON.stringify(["reports_read"]) },
         ],
       });

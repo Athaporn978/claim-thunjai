@@ -1,8 +1,33 @@
 /**
- * Maps Claude's English part names + vehicle/severity → uklang Thai catalog price.
+ * Maps Claude's English part names + vehicle/severity → labor-price catalog price.
  * Returns a price range (low/mid/high) in THB.
+ *
+ * Source: LaborPrice only (real per-brand/per-model data, 21 brands, see
+ * scripts/import-labor-prices.ts). The old generic vehicleType+size RepairPrice
+ * table was retired (stale, hadn't been updated in a long time) — a brand/model/part
+ * not found in LaborPrice returns unmatched (null), never a guessed price.
  */
 import { prisma } from "./db";
+import { normalizePart } from "./partNameMap";
+
+// AI/user-supplied make → canonical LaborPrice.brand casing (see BRAND_MAP in
+// scripts/import-labor-prices.ts for the source-side half of this normalization).
+const BRAND_ALIASES: Record<string, string> = {
+  "toyota": "Toyota", "honda": "Honda", "isuzu": "Isuzu", "nissan": "Nissan",
+  "mazda": "Mazda", "mitsubishi": "Mitsubishi", "mitsu": "Mitsubishi",
+  "ford": "Ford", "mg": "MG", "byd": "BYD", "suzuki": "Suzuki",
+  "gwm": "GWM", "great wall": "GWM", "haval": "GWM",
+  "hyundai": "Hyundai", "subaru": "Subaru",
+  "mercedes-benz": "Mercedes-Benz", "mercedes": "Mercedes-Benz", "benz": "Mercedes-Benz",
+  "bmw": "BMW", "volvo": "Volvo", "tesla": "Tesla",
+  "audi": "Audi", "mini": "MINI", "mini cooper": "MINI",
+  "lexus": "Lexus", "porsche": "Porsche", "ora": "ORA", "deepal": "Deepal",
+};
+
+export function canonicalBrand(make: string | undefined): string | null {
+  if (!make) return null;
+  return BRAND_ALIASES[make.toLowerCase().trim()] ?? null;
+}
 
 // Map English part names from AI → canonical Thai part name in uklang catalog
 const PART_MAP: Record<string, string> = {
@@ -107,46 +132,32 @@ export async function lookupPrice(args: {
   const vehicleType = classifyVehicle({ make: args.make, bodyType: args.bodyType });
   const size = classifySize(args.model);
 
-  // Resolve canonical Thai part name
+  // Resolve canonical Thai part name — prefer the shared normalizer (also used at
+  // LaborPrice import time) so query-side and data-side names line up; fall back to
+  // the legacy local map / raw text for anything it doesn't recognize.
+  const { standardName, position } = normalizePart(args.partTh || args.partEn);
   const enKey = args.partEn.toLowerCase().trim();
-  let partTh = PART_MAP[enKey];
-  if (!partTh && args.partTh) {
-    // try direct match using AI-supplied Thai
-    partTh = args.partTh;
-  }
-  if (!partTh) partTh = args.partTh || args.partEn;
+  const partTh = standardName || PART_MAP[enKey] || args.partTh || args.partEn;
 
   const empty: PriceEstimate = {
     partTh, matched: false, vehicleType, size,
     repair: null, replace: null, low: null, high: null,
-    source: "uklang.com (สมาคมอู่กลางการประกันภัย)",
+    source: "LaborPrice (21-brand labor-code catalog)",
   };
 
-  // Try exact match first
-  let row = await prisma.repairPrice.findFirst({
-    where: { vehicleType, partTh, size },
-  });
+  // LaborPrice — real per-brand/per-model data (21 brands). Only attempted when
+  // the make resolves to a brand we actually imported; no match → unmatched.
+  const brand = canonicalBrand(args.make);
+  if (!brand) return empty;
 
-  // Fall back to partial Thai name match
-  if (!row) {
-    row = await prisma.repairPrice.findFirst({
-      where: {
-        vehicleType,
-        size,
-        partTh: { contains: partTh.replace(/หน้า|หลัง|ซ้าย|ขวา/g, "").trim() || partTh },
-      },
-    });
-  }
+  const laborRow = await lookupLaborPrice({ brand, model: args.model, partTh, position });
+  if (!laborRow) return empty;
 
-  if (!row) return empty;
-
-  const repairKey = args.severity;
-  const repair = (row as unknown as Record<string, number | null>)[repairKey] ?? null;
-  const replace = row.replace ?? null;
-
+  const repair = (laborRow as unknown as Record<string, number | null>)[args.severity] ?? null;
+  const replace = laborRow.replace ?? null;
   const numbers = [repair, replace].filter((v): v is number => v != null);
   return {
-    partTh: row.partTh,
+    partTh: laborRow.partTh,
     matched: true,
     vehicleType,
     size,
@@ -154,8 +165,35 @@ export async function lookupPrice(args: {
     replace,
     low: numbers.length ? Math.min(...numbers) : null,
     high: numbers.length ? Math.max(...numbers) : null,
-    source: "uklang.com (สมาคมอู่กลางการประกันภัย)",
+    source: `labor-code (${laborRow.brand})`,
   };
+}
+
+// brand+model+part+position → brand+model+part → (only if no model was supplied
+// at all) brand+part. Deliberately does NOT fall back to brand-only pricing when a
+// model WAS supplied but not found — prices vary too much between models of the same
+// brand (e.g. BMW Series 1 vs Series 7) to guess from a different model. In that case
+// the caller gets no match and the user enters the shop-quoted price directly.
+export async function lookupLaborPrice(args: {
+  brand: string; model?: string; partTh: string; position: "L" | "R" | null;
+}) {
+  const { brand, model, partTh, position } = args;
+
+  if (!model) {
+    return prisma.laborPrice.findFirst({
+      where: { brand, partTh: { contains: partTh } },
+    });
+  }
+
+  if (position) {
+    const row = await prisma.laborPrice.findFirst({
+      where: { brand, model: { contains: model }, partTh: { contains: partTh }, position },
+    });
+    if (row) return row;
+  }
+  return prisma.laborPrice.findFirst({
+    where: { brand, model: { contains: model }, partTh: { contains: partTh } },
+  });
 }
 
 export async function estimateTotal(damages: Array<{

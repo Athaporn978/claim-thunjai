@@ -51,6 +51,30 @@ model RepairPrice {
   @@index([partTh])
 }
 
+// Labor price catalog imported from real repair-shop labor-code sheets, keyed by
+// brand + model (+ optional submodel/position), replacing the generic vehicleType/size
+// tiers of RepairPrice with real per-brand, per-model pricing.
+// See src/lib/partNameMap.ts for the part-name normalization used at import time.
+model LaborPrice {
+  id          Int      @id @default(autoincrement())
+  brand       String   // normalized brand, e.g. "Toyota", "Mercedes-Benz" (see scripts/import-labor-prices.mjs BRAND_MAP)
+  model       String   // e.g. "Camry", "Serie 3", "S07"
+  submodel    String?  // only populated where meaningful (ISUZU paint type, FORD cab type)
+  position    String?  // "L" | "R" | null
+  partTh      String   // canonical Thai part name (via partNameMap.ts)
+  partThRaw   String   // original "รายการ (Subject)" text from the Excel row, for traceability
+  replace     Float?   // เปลี่ยน
+  minor       Float?   // ซ่อมเบา (S)
+  moderate    Float?   // ซ่อมกลาง (M)
+  severe      Float?   // ซ่อมหนัก (L)
+  remark      String?
+  sourceSheet String   // originating Excel sheet name, for traceability
+  createdAt   DateTime @default(now())
+
+  @@index([brand, model, partTh])
+  @@index([partTh])
+}
+
 // Realistic spare part reference prices catalog (by brand, model, year)
 model PartCatalogPrice {
   id               Int     @id @default(autoincrement())
@@ -103,36 +127,6 @@ model InspectionCase {
   submittedAt DateTime?
   reviewedAt  DateTime?
   reviewNote  String?
-}
-
-// Email intake — a case ingested from a service-center email (semi-automated).
-// AI extracts fields + analyzes photos; staff reviews/completes missing data.
-model Intake {
-  id          String   @id @default(cuid())
-  intakeNo    String   @unique
-  fromEmail   String?
-  subject     String?
-  emailBody   String?
-  status      String   @default("received") // received | processing | needs_info | completed | failed
-
-  // AI-extracted (staff can edit)
-  customer     String?
-  licensePlate String?
-  vehicleMake  String?
-  vehicleModel String?
-  vehicleYear  Int?
-  claimNumber  String?
-  policyNo     String?
-  insurer      String?
-  centerName   String?
-  centerContact String?
-
-  photos   String?  // JSON: [{ url(dataURL) }]
-  analysis String?  // JSON: { results, overallSeverity, totalLow, totalHigh, damageCount }
-  missing  String?  // JSON: [fieldName]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // Repair quotation review — staff records the service-center quote vs. controlled

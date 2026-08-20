@@ -26,6 +26,13 @@ export type Damage = {
   priceEstimate?: PriceEstimate;
 };
 
+export type VehicleConflict = {
+  detectedMake?: string | null;
+  makeMatch?: boolean | null;
+  detectedPlate?: string | null;
+  plateMatch?: boolean | null;
+};
+
 export type AnalyzeResult = {
   vehicleMake?: string;
   vehicleColor?: string;
@@ -33,6 +40,7 @@ export type AnalyzeResult = {
   overallSeverity?: string;
   damages?: Damage[];
   totalEstimate?: { low: number; high: number; matchedCount: number; totalCount: number };
+  vehicleConflict?: VehicleConflict;
   error?: string;
   raw?: string;
 };

@@ -1,6 +1,49 @@
 import type { NextConfig } from "next";
 
+const isProd = process.env.NODE_ENV === "production";
+
+// Next.js App Router injects inline hydration scripts on every page, and this app has no
+// nonce-based CSP wiring (that requires forcing dynamic rendering on every route — see
+// node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md "Without Nonces").
+// So script-src/style-src use 'unsafe-inline' per that guide's documented non-nonce pattern —
+// still blocks external script/style injection, which is the actual attack this defends against.
+//
+// Images/PDFs are stored as base64 data: URIs (see AGENTS.md), so img-src must allow data:.
+// The UI loads Sarabun/Inter from Google Fonts, so style-src/font-src allow those two hosts.
+// connect-src 'self' covers same-origin fetch() from the client; the Anthropic API is only
+// ever called server-side, never from the browser.
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`, // dev HMR needs eval; prod build does not
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self'" + (isProd ? "" : " ws: wss:"), // dev HMR websocket
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+const SECURITY_HEADERS = [
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Content-Security-Policy", value: CSP },
+  ...(isProd
+    ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]
+    : []),
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: SECURITY_HEADERS,
+      },
+    ];
+  },
   async redirects() {
     return [
       {

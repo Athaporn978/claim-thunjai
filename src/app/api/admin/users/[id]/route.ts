@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/auditLog";
+import { hashPassword } from "@/lib/password";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     };
 
     if (username) updateData.username = username;
-    if (password) updateData.password = password;
+    if (password) updateData.password = await hashPassword(password);
 
     const updated = await prisma.employee.update({
       where: { id },

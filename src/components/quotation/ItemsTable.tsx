@@ -165,9 +165,14 @@ export function ItemsTable({
                         >
                           ↧ {lang === "th" ? "ดึงราคากลาง" : "Pull standard"}
                         </button>
-                        {r.standardPrice != null && (
+                        {r.standardPrice != null && r.standardPrice > 0 && (
                           <span className="text-[11px] text-slate-500 font-mono font-medium">
                             {lang === "th" ? "กลาง:" : "Std:"} {fmtBaht(r.standardPrice, lang)}
+                          </span>
+                        )}
+                        {r.standardPrice === 0 && (
+                          <span className="text-[11px] text-slate-600 font-semibold bg-slate-200 border border-slate-300 px-1.5 py-0.5 rounded">
+                            {lang === "th" ? "ยังไม่มีราคากลาง" : "No standard price"}
                           </span>
                         )}
                       </div>

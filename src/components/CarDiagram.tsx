@@ -140,24 +140,30 @@ function resolveHotspots(body: BodyStyle, angle: Angle): CarPart[] {
 // The uklang price table names parts differently per vehicle category
 // (pickup/van use their own terms). Each hotspot maps to several candidate
 // catalog names; we pick the first one that actually has a price for this model.
+// Aliases also include the canonical names produced by src/lib/partNameMap.ts,
+// since LaborPrice.partTh (imported from the 21-sheet labor-code Excel) is
+// normalized through that map and often names things slightly differently than
+// this diagram's original uklang-based partTh values (e.g. "กระจกบังลมหน้า" here
+// vs "กระจกหน้า" from partNameMap.ts).
 const PART_ALTS: Record<string, string[]> = {
-  windshield: ["บังลมหน้า"],
+  windshield: ["บังลมหน้า", "กระจกหน้า"],
   hood: ["ฝากระโปรง"],
   "front-bumper": ["กันชน"],
   // headlight lamp isn't priced directly; use the headlight housing/panel
-  "headlight-l": ["เบ้าไฟ", "แผงรับไฟหน้า", "แผงปิดไฟใหญ่หน้า", "คิ้วใต้ไฟ"],
-  "headlight-r": ["เบ้าไฟ", "แผงรับไฟหน้า", "แผงปิดไฟใหญ่หน้า", "คิ้วใต้ไฟ"],
-  "rear-window": ["บังลมหลัง", "แผงใต้กระจกบังลมหลัง"],
-  trunk: ["ฝาปิดท้าย"],
-  "taillight-l": ["เบ้ายึดไฟท้าย", "คิ้วใต้ไฟท้าย", "มุมไฟท้าย ซ้าย-ขวา"],
-  "taillight-r": ["เบ้ายึดไฟท้าย", "คิ้วใต้ไฟท้าย", "มุมไฟท้าย ซ้าย-ขวา"],
+  "headlight-l": ["เบ้าไฟ", "แผงรับไฟหน้า", "แผงปิดไฟใหญ่หน้า", "คิ้วใต้ไฟ", "เบ้าไฟหน้า"],
+  "headlight-r": ["เบ้าไฟ", "แผงรับไฟหน้า", "แผงปิดไฟใหญ่หน้า", "คิ้วใต้ไฟ", "เบ้าไฟหน้า"],
+  grille: ["กระจัง"],
+  "rear-window": ["บังลมหลัง", "แผงใต้กระจกบังลมหลัง", "กระจกหลัง"],
+  trunk: ["ฝาปิดท้าย", "ฝาท้าย"],
+  "taillight-l": ["เบ้ายึดไฟท้าย", "คิ้วใต้ไฟท้าย", "มุมไฟท้าย ซ้าย-ขวา", "เบ้าไฟท้าย"],
+  "taillight-r": ["เบ้ายึดไฟท้าย", "คิ้วใต้ไฟท้าย", "มุมไฟท้าย ซ้าย-ขวา", "เบ้าไฟท้าย"],
   "rear-bumper": ["กันชน"],
   "front-fender": ["แก้มหน้า"],
   "front-door": ["ประตูเลื่อนข้าง", "โครงในประตู"],
   "rear-door": ["ประตูเลื่อนข้าง", "โครงในประตู"],
   "rear-fender": ["แผงข้างด้านมีประตูเลื่อน", "ชายล่างกระบะ", "ขอบกระบะบน"],
-  "wheel-front": ["ฝาครอบล้อ", "ล้อแม็ก", "ล้อเหล็ก", "ซ่อมกระทะล้อแม็ก", "ซ่อมกระทะล้อเหล็ก"],
-  "wheel-rear": ["ฝาครอบล้อ", "ล้อแม็ก", "ล้อเหล็ก", "ซ่อมกระทะล้อแม็ก", "ซ่อมกระทะล้อเหล็ก"],
+  "wheel-front": ["ฝาครอบล้อ", "ล้อแม็ก", "ล้อเหล็ก", "ซ่อมกระทะล้อแม็ก", "ซ่อมกระทะล้อเหล็ก", "กะทะล้อเหล็ก"],
+  "wheel-rear": ["ฝาครอบล้อ", "ล้อแม็ก", "ล้อเหล็ก", "ซ่อมกระทะล้อแม็ก", "ซ่อมกระทะล้อเหล็ก", "กะทะล้อเหล็ก"],
 };
 
 // Returns the catalog part name that has a price for this model, or null.

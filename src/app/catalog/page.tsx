@@ -31,14 +31,16 @@ export default function CatalogPage() {
     setModelId(b.models[0].id);
   };
 
-  // Fetch Labor Prices
+  // Fetch Labor Prices — sourced from LaborPrice (real per-brand/per-model data),
+  // matched via src/lib/laborPriceAlias.ts since carCatalog and the labor-code
+  // Excel name brands/models differently.
   useEffect(() => {
     setLoadingLabor(true);
-    fetch(`/api/prices?vehicleType=${model.vehicleType}&size=${model.size}`)
+    fetch(`/api/prices?brandId=${brandId}&modelId=${modelId}`)
       .then((r) => r.json())
       .then((d) => setPrices(d.prices || {}))
       .finally(() => setLoadingLabor(false));
-  }, [model.vehicleType, model.size]);
+  }, [brandId, modelId]);
 
   useEffect(() => {
     const parts = getAngleParts(angle, bodyType);

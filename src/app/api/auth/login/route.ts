@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/auditLog";
+import { createSessionToken, SESSION_COOKIE_NAME, SESSION_COOKIE_MAX_AGE_SECONDS } from "@/lib/session";
+import { verifyPassword, hashPassword, isBcryptHash } from "@/lib/password";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function parsePermissions(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((p) => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function withSessionCookie(
+  res: NextResponse,
+  user: { id: string; email: string; roleName: string; branchName: string; name: string; permissions: string[] },
+) {
+  const token = createSessionToken(user);
+  res.cookies.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
+  });
+  return res;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,72 +57,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (!employee) {
-      // Demo credentials fallback for testing
-      if (email === "admin@claimthunjai.com" || email === "athaporn@htechnology.com" || email === "admin@htechnology.com") {
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: "admin-default",
-            code: "EMP-001",
-            name: "อรรถพล โชคชัย (Super Admin)",
-            email: "athaporn@htechnology.com",
-            roleName: "Super Administrator",
-            branchName: "สำนักงานใหญ่ (กรุงเทพมหานคร)",
-          },
-        });
-      }
-      if (email === "somchai@htechnology.com") {
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: "emp-somchai",
-            code: "EMP-002",
-            name: "สมชาย มีสุข (สาขาลาดพร้าว)",
-            email: "somchai@htechnology.com",
-            roleName: "เจ้าหน้าที่คุมราคา",
-            branchName: "สาขาลาดพร้าว (กรุงเทพมหานคร)",
-          },
-        });
-      }
-      if (email === "kanya@htechnology.com") {
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: "emp-kanya",
-            code: "EMP-003",
-            name: "กัญญา วงศ์ใหญ่ (สาขาเชียงใหม่)",
-            email: "kanya@htechnology.com",
-            roleName: "เจ้าหน้าที่คุมราคา",
-            branchName: "สาขาเชียงใหม่",
-          },
-        });
-      }
-      if (email === "supervisor_latphrao@htechnology.com") {
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: "emp-sup-latphrao",
-            code: "EMP-005",
-            name: "สมเกียรติ ยิ่งใหญ่ (หัวหน้าคุมราคา-ลาดพร้าว)",
-            email: "supervisor_latphrao@htechnology.com",
-            roleName: "หัวหน้าคุมราคา (Supervisor)",
-            branchName: "สาขาลาดพร้าว (กรุงเทพมหานคร)",
-          },
-        });
-      }
-      if (email === "supervisor_chiangmai@htechnology.com") {
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: "emp-sup-chiangmai",
-            code: "EMP-006",
-            name: "นภา สว่างจิต (หัวหน้าคุมราคา-เชียงใหม่)",
-            email: "supervisor_chiangmai@htechnology.com",
-            roleName: "หัวหน้าคุมราคา (Supervisor)",
-            branchName: "สาขาเชียงใหม่",
-          },
-        });
-      }
       return NextResponse.json({ error: "ไม่พบข้อมูลอีเมลนี้ในระบบ" }, { status: 401 });
     }
 
@@ -112,8 +73,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify password if set
-    if (employee.password && employee.password !== password) {
-      return NextResponse.json({ error: "รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองอีกครั้ง" }, { status: 401 });
+    if (employee.password) {
+      const ok = await verifyPassword(password, employee.password);
+      if (!ok) {
+        return NextResponse.json({ error: "รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองอีกครั้ง" }, { status: 401 });
+      }
+      // Lazy-migrate legacy plaintext passwords to a bcrypt hash on successful login.
+      if (!isBcryptHash(employee.password)) {
+        await prisma.employee.update({
+          where: { id: employee.id },
+          data: { password: await hashPassword(password) },
+        });
+      }
     }
 
     const performerName = `${employee.name} (${employee.role?.name || "พนักงาน"})`;
@@ -127,17 +98,16 @@ export async function POST(req: NextRequest) {
       performerName,
     });
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: employee.id,
-        code: employee.code,
-        name: employee.name,
-        email: employee.email,
-        roleName: employee.role?.name || "พนักงาน",
-        branchName: employee.branch?.name || "ไม่ระบุสาขา",
-      },
-    });
+    const user = {
+      id: employee.id,
+      code: employee.code,
+      name: employee.name,
+      email: employee.email,
+      roleName: employee.role?.name || "พนักงาน",
+      branchName: employee.branch?.name || "ไม่ระบุสาขา",
+      permissions: parsePermissions(employee.role?.permissions),
+    };
+    return withSessionCookie(NextResponse.json({ success: true, user }), user);
   } catch (err) {
     console.error("Login error:", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" }, { status: 500 });

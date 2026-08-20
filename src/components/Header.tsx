@@ -12,7 +12,6 @@ export function Header() {
   if (
     pathname?.startsWith("/inspect/") ||
     pathname?.startsWith("/dashboard") ||
-    pathname?.startsWith("/intake") ||
     pathname?.startsWith("/analyze") ||
     pathname?.startsWith("/admin/") ||
     pathname?.startsWith("/catalog") ||

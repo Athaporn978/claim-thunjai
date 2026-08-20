@@ -40,40 +40,6 @@ function mapExcelRowToPartCatalog(row: Record<string, any>) {
   };
 }
 
-function mapExcelRowToLaborPrice(row: Record<string, any>) {
-  const getVal = (...keys: string[]) => {
-    for (const key of Object.keys(row)) {
-      const kClean = key.trim().toLowerCase();
-      for (const target of keys) {
-        if (kClean === target.toLowerCase() || kClean.includes(target.toLowerCase())) {
-          return row[key];
-        }
-      }
-    }
-    return undefined;
-  };
-
-  const vehicleType = getVal("vehicletype", "ประเภทรถ", "กลุ่มรถ", "ประเภท") || "sedan_asia";
-  const partTh = getVal("partth", "part", "partname", "name", "description", "รายการ", "รายการซ่อม", "ชื่อชิ้นส่วน", "ชิ้นส่วน", "ชื่อรายการ", "รายการอะไหล่", "ชื่ออะไหล่", "คำอธิบาย") || "";
-  const size = getVal("size", "ขนาด", "ไซส์") || "A";
-  const minor = getVal("minor", "ซ่อมเบา", "เบา");
-  const moderate = getVal("moderate", "ซ่อมกลาง", "กลาง");
-  const severe = getVal("severe", "ซ่อมหนัก", "หนัก");
-  const replace = getVal("replace", "เปลี่ยน", "เปลี่ยนใหม่", "ราคาเปลี่ยน", "ราคาศูนย์", "ราคาห้าง", "ราคา");
-  const note = getVal("note", "หมายเหตุ", "remark") || "";
-
-  return {
-    vehicleType: String(vehicleType).trim(),
-    partTh: String(partTh).trim(),
-    size: String(size).trim(),
-    minor: minor ? Number(minor) : null,
-    moderate: moderate ? Number(moderate) : null,
-    severe: severe ? Number(severe) : null,
-    replace: replace ? Number(replace) : null,
-    note: note ? String(note).trim() : null,
-  };
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -114,64 +80,17 @@ export async function POST(req: Request) {
     const CHUNK_SIZE = 1000;
 
     if (importType === "labor") {
-      // Process Labor Prices (RepairPrice) with Strict Validation
-      const validItems: any[] = [];
-      for (const rawItem of items) {
-        const item = mapExcelRowToLaborPrice(rawItem);
-        // Strict Check: Must have partTh AND at least one valid repair/replacement price > 0
-        const hasPrice = (item.minor && item.minor > 0) ||
-                         (item.moderate && item.moderate > 0) ||
-                         (item.severe && item.severe > 0) ||
-                         (item.replace && item.replace > 0);
-
-        if (!item.partTh || item.partTh.length < 2 || !hasPrice) {
-          failedCount++;
-          continue;
-        }
-        validItems.push({
-          vehicleType: item.vehicleType || "sedan_asia",
-          partTh: item.partTh,
-          size: item.size || "A",
-          minor: item.minor,
-          moderate: item.moderate,
-          severe: item.severe,
-          replace: item.replace,
-          note: item.note,
-        });
-      }
-
-      if (validItems.length === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "⚠️ ไม่พบรายการราคาค่าแรงที่สมบูรณ์ในไฟล์นี้ กรุณาตรวจสอบหัวตารางให้ตรงกับ Template หรือตรวจสอบว่าอัปโหลดตรงกล่องหรือไม่",
-          },
-          { status: 400 }
-        );
-      }
-
-      for (let i = 0; i < validItems.length; i += CHUNK_SIZE) {
-        const chunk = validItems.slice(i, i + CHUNK_SIZE);
-        try {
-          await prisma.repairPrice.createMany({
-            data: chunk,
-          });
-          successCount += chunk.length;
-        } catch {
-          for (const item of chunk) {
-            try {
-              await prisma.repairPrice.upsert({
-                where: { vehicleType_partTh_size: { vehicleType: item.vehicleType, partTh: item.partTh, size: item.size } },
-                update: { minor: item.minor, moderate: item.moderate, severe: item.severe, replace: item.replace, note: item.note },
-                create: item,
-              });
-              successCount++;
-            } catch {
-              failedCount++;
-            }
-          }
-        }
-      }
+      // Disabled — RepairPrice (the generic vehicleType+size labor price table this
+      // wrote to) has been replaced by LaborPrice (real per-brand/per-model data
+      // imported from the 21-sheet labor-code Excel, see scripts/import-labor-prices.ts).
+      // Writing here would silently go to a table nothing reads anymore.
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ฟีเจอร์นี้ปิดใช้งานชั่วคราว — ระบบเปลี่ยนไปใช้ข้อมูลราคาค่าแรงชุดใหม่ (LaborPrice) แล้ว กรุณาติดต่อผู้ดูแลระบบหากต้องการอัปเดตราคาค่าแรง",
+        },
+        { status: 410 },
+      );
     } else {
       // Process Spare Part Prices (PartCatalogPrice) with Strict Validation
       const validItems: any[] = [];

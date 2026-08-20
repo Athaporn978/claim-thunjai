@@ -11,7 +11,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const isPortal =
     pathname?.startsWith("/dashboard") ||
-    pathname?.startsWith("/intake") ||
     pathname?.startsWith("/analyze") ||
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/catalog") ||

@@ -1,28 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { BRANDS } from "@/lib/carCatalog";
+import { canonicalBrand, lookupLaborPrice } from "@/lib/priceLookup";
+import { normalizePart } from "@/lib/partNameMap";
 import type Anthropic from "@anthropic-ai/sdk";
-
-// Resolve vehicleType + size from AI-extracted brand/model, same catalog the UI uses.
-function resolveVehicleTypeSize(brandRaw?: string, modelRaw?: string) {
-  const brand = (brandRaw || "").toLowerCase().trim();
-  const model = (modelRaw || "").toLowerCase().trim();
-  if (brand) {
-    const brandObj = BRANDS.find(
-      (b) => b.name.toLowerCase().includes(brand) || brand.includes(b.name.toLowerCase())
-    );
-    if (brandObj) {
-      const modelObj = brandObj.models.find(
-        (m) => model && (m.name.toLowerCase().includes(model) || model.includes(m.name.toLowerCase()))
-      );
-      if (modelObj) return { vehicleType: modelObj.vehicleType, size: modelObj.size };
-      if (brandObj.models.length > 0) {
-        return { vehicleType: brandObj.models[0].vehicleType, size: brandObj.models[0].size };
-      }
-    }
-  }
-  return { vehicleType: "sedan_asia", size: "B" };
-}
 
 // Guess repair-severity tier from keywords in the labor line-item name.
 function detectSeverityTier(name: string): "minor" | "moderate" | "severe" | "replace" {
@@ -303,13 +282,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
 
     const rawItems = Array.isArray(parsedResult) ? parsedResult : parsedResult.items || [];
 
-    const { vehicleType, size } = resolveVehicleTypeSize(parsedResult.vehicleBrand, parsedResult.vehicleModel);
-
-    const CORE_BODY_KEYWORDS = [
-      "กันชนหน้า", "กันชนหลัง", "คานกันชน", "ฝากระโปรงหน้า", "ฝากระโปรงหลัง", "ฝาท้าย",
-      "บังโคลนหน้า", "บังโคลนหลัง", "ประตูหน้า", "ประตูหลัง", "หลังคา", "กระจังหน้า",
-      "กระจกหน้า", "กระจกหลัง", "ไฟหน้า", "ไฟท้าย", "แผงท้าย", "พื้นในท้าย", "คิ้วข้าง", "กาบประตู"
-    ];
+    const laborBrand = canonicalBrand(parsedResult.vehicleBrand);
 
     const cleanItems = await Promise.all(
       rawItems
@@ -323,32 +296,22 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
 
           if (itemType === "labor") {
             try {
-              let matchKw = "";
-              for (const kw of CORE_BODY_KEYWORDS) {
-                if (cleanName.includes(kw)) {
-                  matchKw = kw;
-                  break;
-                }
-              }
+              const tier = detectSeverityTier(cleanName);
 
-              if (!matchKw) {
-                matchKw = cleanName
-                  .replace(/^(เคาะ-พ่นสี|พ่นสี-ประกอบ|เคาะ|พ่นสี|ถอดประกอบ|ซ่อม|เปลี่ยน)\s*/gi, "")
-                  .replace(/[\s\-\/\(\)]+/g, " ")
-                  .trim();
-              }
-
-              if (matchKw) {
-                const tier = detectSeverityTier(cleanName);
-                // Prefer an exact vehicleType+size match; relax progressively so we
-                // still surface a plausible price instead of nothing.
-                const dbMatch =
-                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw }, vehicleType, size } })) ??
-                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw }, vehicleType } })) ??
-                  (await prisma.repairPrice.findFirst({ where: { partTh: { contains: matchKw } } }));
-                if (dbMatch) {
-                  const tierValue = (dbMatch as unknown as Record<string, number | null>)[tier];
-                  stdPrice = tierValue ?? dbMatch.moderate ?? dbMatch.minor ?? dbMatch.severe ?? dbMatch.replace ?? null;
+              // LaborPrice — real per-brand/per-model data. normalizePart() also
+              // strips shop action-code prefixes (ซ/พ, ป/พ, ถอด-ใส่, ...) that would
+              // otherwise pollute the keyword match. No match → stdPrice stays null,
+              // never a guessed price from an unrelated brand/model/vehicleType.
+              if (laborBrand) {
+                const { standardName, position } = normalizePart(cleanName);
+                if (standardName) {
+                  const laborRow = await lookupLaborPrice({
+                    brand: laborBrand, model: parsedResult.vehicleModel, partTh: standardName, position,
+                  });
+                  if (laborRow) {
+                    const tierValue = (laborRow as unknown as Record<string, number | null>)[tier];
+                    stdPrice = tierValue ?? laborRow.moderate ?? laborRow.minor ?? laborRow.severe ?? laborRow.replace ?? null;
+                  }
                 }
               }
             } catch {}
@@ -359,7 +322,9 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
             name: cleanName,
             unitPrice: uPrice,
             qty: Number(i.qty) || 1,
-            standardPrice: stdPrice != null ? stdPrice : uPrice,
+            // null when no standard price was matched — do NOT mirror the shop-quoted
+            // price here, or the UI will look like a match happened when it didn't.
+            standardPrice: stdPrice,
           };
         })
     );

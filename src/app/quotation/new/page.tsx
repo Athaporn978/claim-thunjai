@@ -7,6 +7,7 @@ import { PhotoUploader } from "@/components/quotation/PhotoUploader";
 import { BRANDS } from "@/lib/carCatalog";
 import { totals, fmtBaht, type QuotationInput, type QuotationItemInput, type QuotationPhoto, type ItemType } from "@/lib/quotation";
 import { useSidebar } from "@/lib/SidebarContext";
+import { validateVin } from "@/lib/vinValidation";
 
 const EMPTY: QuotationInput = {
   status: "draft",
@@ -50,6 +51,44 @@ const VEHICLE_CATEGORIES = [
   { v: "van", th: "รถตู้ / MPV", en: "Van / MPV" },
 ];
 
+function VinField({ value, onChange, make, year, lang }: {
+  value: string | null | undefined; onChange: (v: string) => void;
+  make?: string; year?: string | number; lang: string;
+}) {
+  const vin = ((value || "")).toUpperCase();
+  const result = validateVin(vin, { make, year });
+  const hasError = !!result.formatError;
+  const hasWarnings = result.warnings.length > 0;
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">
+        {lang === "th" ? "หมายเลขตัวถัง (VIN)" : "VIN / Chassis No."}
+      </label>
+      <input
+        type="text"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+        placeholder="17-character VIN"
+        maxLength={17}
+        className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:border-[var(--orange-500)] ${
+          hasError ? "border-red-400 bg-red-50" : "border-slate-200"
+        }`}
+      />
+      {hasError && (
+        <p className="mt-1 text-[11px] text-red-600 font-medium">⛔ {result.formatError}</p>
+      )}
+      {!hasError && hasWarnings && (
+        <div className="mt-1.5 space-y-0.5">
+          {result.warnings.map((w, i) => (
+            <p key={i} className="text-[11px] text-amber-700 font-medium">⚠️ {w}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Field({
   label, value, onChange, type = "text", placeholder, className = "", required = false,
 }: {
@@ -78,8 +117,6 @@ function Wizard() {
   const router = useRouter();
   const sp = useSearchParams();
   const editId = sp.get("id");
-  const fromIntake = sp.get("fromIntake");
-
   const [form, setForm] = useState<QuotationInput>(EMPTY);
   const [step, setStep] = useState(0);
   const [dirty, setDirty] = useState(false);
@@ -108,10 +145,10 @@ function Wizard() {
 
   // Reset form when opening a new quotation
   useEffect(() => {
-    if (!editId && !fromIntake) {
+    if (!editId) {
       resetWizardForm();
     }
-  }, [editId, fromIntake, resetWizardForm]);
+  }, [editId, resetWizardForm]);
 
   // Load existing
   useEffect(() => {
@@ -139,43 +176,6 @@ function Wizard() {
         }
       });
   }, [editId, router]);
-
-  // Prefill from an intake (email or manual)
-  useEffect(() => {
-    if (!fromIntake || editId) return;
-    fetch(`/api/intake/${fromIntake}`)
-      .then((r) => r.json())
-      .then((d) => {
-        const it = d.intake; if (!it) return;
-        let photos: QuotationPhoto[] = [];
-        try {
-          const arr = JSON.parse(it.photos || "[]") as { url: string }[];
-          photos = arr.map((p, idx) => ({ url: p.url, caption: `from-intake ${idx + 1}` }));
-        } catch {}
-        // Map brand → vehicleCategory if it matches a known brand in carCatalog
-        const brand = BRANDS.find((b) => it.vehicleMake && b.name.toLowerCase().includes(String(it.vehicleMake).toLowerCase()));
-        const model = brand?.models.find((m) => it.vehicleModel && m.name.toLowerCase().includes(String(it.vehicleModel).toLowerCase()));
-        setForm((f) => ({
-          ...f,
-          customerName: it.customer ?? f.customerName,
-          licensePlate: it.licensePlate ?? f.licensePlate,
-          vehicleBrand: brand?.name ?? it.vehicleMake ?? f.vehicleBrand,
-          vehicleModel: model?.name ?? it.vehicleModel ?? f.vehicleModel,
-          vehicleYear: it.vehicleYear ?? f.vehicleYear,
-          vehicleCategory: model?.vehicleType ?? f.vehicleCategory,
-          vehicleSize: model?.size ?? f.vehicleSize,
-          insurerName: it.insurer ?? f.insurerName,
-          claimNo: it.claimNumber ?? f.claimNo,
-          policyNo: it.policyNo ?? f.policyNo,
-          centerName: it.centerName ?? f.centerName,
-          centerContact: it.centerContact ?? f.centerContact,
-          photos,
-        }));
-        setDirty(true);
-        setPrefillNote(lang === "th" ? `เติมข้อมูลจากงานเข้า ${it.intakeNo} แล้ว — ตรวจ + เติมค่าแรง/ค่าอะไหล่` : `Prefilled from intake ${it.intakeNo} — review + add labor/parts`);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromIntake, editId]);
 
   const [pendingNavHref, setPendingNavHref] = useState<string>("");
 
@@ -411,7 +411,10 @@ function Wizard() {
         const itemType = i.type === "labor" ? "labor" : "part";
         const quoted = Number(i.unitPrice) || 0;
         const std = i.standardPrice != null ? Number(i.standardPrice) : null;
-        const controlled = (std != null && std < quoted) ? std : quoted;
+        // std === 0 means "no standard price found" (see extract-quote/route.ts),
+        // not a genuine zero price — must not be treated as cheaper than quoted,
+        // or the controlled price would incorrectly collapse to ฿0.
+        const controlled = (std != null && std > 0 && std < quoted) ? std : quoted;
         return {
           type: itemType,
           name: i.name,
@@ -419,7 +422,7 @@ function Wizard() {
           quotedQty: Number(i.qty) || 1,
           controlledUnit: controlled,
           controlledQty: Number(i.qty) || 1,
-          standardPrice: std ?? quoted,
+          standardPrice: std ?? 0,
           sortOrder: index,
         };
       });
@@ -744,7 +747,13 @@ function Wizard() {
                 <option value="C">C · {lang === "th" ? "ใหญ่" : "Large"}</option>
               </select>
             </div>
-            <Field label={lang === "th" ? "หมายเลขตัวถัง" : "Chassis No."} value={form.chassisNo} onChange={(v) => set("chassisNo", v)} />
+            <VinField
+              value={form.chassisNo}
+              onChange={(v) => set("chassisNo", v)}
+              make={form.vehicleBrand || undefined}
+              year={form.vehicleYear || undefined}
+              lang={lang}
+            />
             <Field label={lang === "th" ? "สี" : "Color"} value={form.color} onChange={(v) => set("color", v)} />
             <Field label={lang === "th" ? "เลขไมล์" : "Mileage"} value={form.mileage} onChange={setNum("mileage")} type="number" />
           </div>

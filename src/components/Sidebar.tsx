@@ -59,6 +59,7 @@ export function Sidebar() {
       (currentUser?.email || "").toLowerCase().includes("admin@htechnology.com"));
 
   const handleLogout = () => {
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     if (typeof window !== "undefined") {
       localStorage.removeItem("currentUser");
       localStorage.removeItem("claim_user_profile");

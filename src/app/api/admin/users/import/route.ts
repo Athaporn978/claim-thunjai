@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/auditLog";
+import { hashPassword } from "@/lib/password";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,7 +145,7 @@ export async function POST(req: NextRequest) {
         name,
         email,
         username,
-        password,
+        password: await hashPassword(password),
         phone,
         branchId,
         roleId,

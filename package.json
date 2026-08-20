@@ -6,17 +6,16 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "start:prod-local": "PORT=3001 npm run start -- --hostname 127.0.0.1 --port 3001",
-    "poll:gmail": "node --env-file=.env scripts/imap-poller.mjs"
+    "start:prod-local": "PORT=3001 npm run start -- --hostname 127.0.0.1 --port 3001"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@types/bcryptjs": "^2.4.6",
     "adm-zip": "^0.6.0",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.10.0",
-    "imapflow": "^1.5.0",
-    "mailparser": "^3.9.14",
     "next": "16.2.7",
     "pdf-parse": "^1.1.1",
     "prisma": "^7.8.0",

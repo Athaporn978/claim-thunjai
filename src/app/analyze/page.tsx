@@ -1,12 +1,196 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLang } from "@/lib/LangContext";
 import { DamageReportView, type AnalyzeResult } from "@/components/DamageReportView";
 import { signature, isDuplicate, type ImgSig } from "@/lib/imageHash";
+import { validateVin } from "@/lib/vinValidation";
+import { BRANDS } from "@/lib/carCatalog";
 
 type UploadedImage = { file: File; preview: string; base64: string; mediaType: string; sig: ImgSig };
 
-const MAX_IMAGES = 60; // soft safety cap
+const MAX_IMAGES = 30; // must match MAX_IMAGES_PER_REQUEST in /api/analyze/route.ts
+
+// Top brands pinned at the top of the dropdown (Thai market priority)
+const TOP_BRAND_NAMES = [
+  "Toyota", "Honda", "Isuzu", "Nissan", "Mitsubishi",
+  "Mazda", "Ford", "BYD", "MG", "BMW", "Mercedes-Benz", "Suzuki",
+];
+const ALL_BRAND_NAMES = BRANDS.map((b) => b.name);
+
+function BrandCombobox({ value, onChange, lang }: {
+  value: string; onChange: (v: string) => void; lang: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  const q = query.toLowerCase().trim();
+  const topMatches = TOP_BRAND_NAMES.filter((b) => !q || b.toLowerCase().includes(q));
+  const otherMatches = ALL_BRAND_NAMES.filter((b) => !TOP_BRAND_NAMES.includes(b) && (!q || b.toLowerCase().includes(q)));
+  const showDropdown = open && (topMatches.length > 0 || otherMatches.length > 0);
+
+  const select = (name: string) => {
+    onChange(name);
+    setQuery(name);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="Toyota"
+        className={`px-3 py-2 border rounded-md text-xs w-full focus:ring-2 focus:ring-[#0071e3] ${
+          !value.trim() ? "border-slate-200" : "border-blue-300"
+        }`}
+      />
+      {showDropdown && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {topMatches.map((name) => (
+            <button key={name} onMouseDown={() => select(name)}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 hover:text-[#0071e3]">
+              {name}
+            </button>
+          ))}
+          {topMatches.length > 0 && otherMatches.length > 0 && (
+            <div className="px-3 py-1 text-[10px] text-slate-400 border-t border-slate-100 bg-slate-50 font-medium">
+              {lang === "th" ? "— ยี่ห้ออื่น —" : "— Other brands —"}
+            </div>
+          )}
+          {otherMatches.map((name) => (
+            <button key={name} onMouseDown={() => select(name)}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50">
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModelCombobox({ value, onChange, make, lang }: {
+  value: string; onChange: (v: string, bodyStyle?: string) => void; make: string; lang: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  const brand = BRANDS.find((b) => b.name.toLowerCase() === make.toLowerCase());
+  const models = brand?.models ?? [];
+  const q = query.toLowerCase().trim();
+  const filtered = models.filter((m) => !q || m.name.toLowerCase().includes(q));
+
+  const select = (name: string, bodyStyle?: string) => {
+    onChange(name, bodyStyle);
+    setQuery(name);
+    setOpen(false);
+  };
+
+  // Brand not in catalog — fall back to free-text
+  if (!brand) {
+    return (
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={lang === "th" ? "รุ่นรถ" : "Model"}
+        className={`px-3 py-2 border rounded-md text-xs w-full focus:ring-2 focus:ring-[#0071e3] ${
+          !value.trim() ? "border-slate-200" : "border-blue-300"
+        }`}
+      />
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder={lang === "th" ? "ค้นหารุ่น..." : "Search model..."}
+        className={`px-3 py-2 border rounded-md text-xs w-full focus:ring-2 focus:ring-[#0071e3] ${
+          !value.trim() ? "border-slate-200" : "border-blue-300"
+        }`}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {filtered.map((m) => (
+            <button key={m.id} onMouseDown={() => select(m.name, m.bodyStyle)}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 hover:text-[#0071e3]">
+              {m.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VinField({ value, onChange, make, year, lang }: {
+  value: string; onChange: (v: string) => void;
+  make?: string; year?: string | number; lang: string;
+}) {
+  const vin = (value || "").toUpperCase();
+  const result = validateVin(vin, { make, year });
+  const hasError = !!result.formatError;
+  const hasWarnings = result.warnings.length > 0;
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600">
+        {lang === "th" ? "หมายเลขตัวถัง (VIN)" : "VIN / Chassis No."}
+      </label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+        placeholder="17-character VIN"
+        maxLength={17}
+        className={`mt-1 w-full px-3 py-2 border rounded-md font-mono text-xs focus:ring-2 focus:ring-[#0071e3] ${
+          hasError ? "border-red-400 bg-red-50" : "border-slate-200"
+        }`}
+      />
+      {hasError && (
+        <p className="mt-1 text-[11px] text-red-600 font-medium">⛔ {result.formatError}</p>
+      )}
+      {!hasError && hasWarnings && (
+        <div className="mt-1.5 space-y-0.5">
+          {result.warnings.map((w, i) => (
+            <p key={i} className="text-[11px] text-amber-700 font-medium">⚠️ {w}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BODY_TYPES = [
+  { value: "sedan", th: "เก๋ง / Sedan" },
+  { value: "suv",   th: "SUV" },
+  { value: "pickup", th: "กระบะ / Pickup" },
+  { value: "van",   th: "รถตู้ / Van" },
+];
 
 export default function AnalyzePage() {
   const { t, lang } = useLang();
@@ -16,12 +200,16 @@ export default function AnalyzePage() {
     policyHolder: "",
     vehicleMake: "",
     vehicleModel: "",
+    vehicleYear: "",
+    vehicleBodyType: "",
     licensePlate: "",
+    vinNumber: "",
   });
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ results: AnalyzeResult[]; overallSeverity: string; claimId?: string } | null>(null);
   const [dupNote, setDupNote] = useState<string>("");
+  const [validationError, setValidationError] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (files: FileList | null) => {
@@ -51,8 +239,6 @@ export default function AnalyzePage() {
 
   const remove = (i: number) => setImages((p) => p.filter((_, idx) => idx !== i));
 
-  const [validationError, setValidationError] = useState<string>("");
-
   const analyze = async () => {
     setValidationError("");
     if (!meta.claimNumber.trim()) {
@@ -61,6 +247,14 @@ export default function AnalyzePage() {
     }
     if (!meta.policyHolder.trim()) {
       setValidationError(lang === "th" ? "กรุณากรอกชื่อผู้เอาประกัน (*)" : "Policy Holder name is required (*)");
+      return;
+    }
+    if (!meta.vehicleMake.trim()) {
+      setValidationError(lang === "th" ? "กรุณากรอกยี่ห้อรถ (*)" : "Vehicle Make is required (*)");
+      return;
+    }
+    if (!meta.vehicleModel.trim()) {
+      setValidationError(lang === "th" ? "กรุณากรอกรุ่นรถ (*)" : "Vehicle Model is required (*)");
       return;
     }
     if (images.length === 0) {
@@ -74,10 +268,7 @@ export default function AnalyzePage() {
 
     const timer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 94) {
-          clearInterval(timer);
-          return 94;
-        }
+        if (prev >= 94) { clearInterval(timer); return 94; }
         return Math.min(94, prev + Math.floor(Math.random() * 8) + 4);
       });
     }, 250);
@@ -91,9 +282,11 @@ export default function AnalyzePage() {
           claimNumber: meta.claimNumber,
           insurerId: "demo",
           policyHolder: meta.policyHolder,
-          vehicleMake: meta.vehicleMake || "Škoda",
-          vehicleModel: meta.vehicleModel || "Superb",
-          licensePlate: meta.licensePlate || "กข-1234",
+          vehicleMake: meta.vehicleMake || undefined,
+          vehicleModel: meta.vehicleModel || undefined,
+          vehicleYear: meta.vehicleYear || undefined,
+          vehicleBodyType: meta.vehicleBodyType || undefined,
+          licensePlate: meta.licensePlate || undefined,
         }),
       });
       const data = await res.json();
@@ -109,6 +302,13 @@ export default function AnalyzePage() {
       clearInterval(timer);
     }
   };
+
+  // Aggregate conflict data across all result images
+  const conflicts = result?.results?.flatMap((r) => r.vehicleConflict ? [r.vehicleConflict] : []) ?? [];
+  const makeMismatch = conflicts.some((c) => c.makeMatch === false);
+  const plateMismatch = conflicts.some((c) => c.plateMatch === false);
+  const detectedMakeExample = conflicts.find((c) => c.makeMatch === false && c.detectedMake)?.detectedMake;
+  const detectedPlateExample = conflicts.find((c) => c.plateMatch === false && c.detectedPlate)?.detectedPlate;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -126,6 +326,8 @@ export default function AnalyzePage() {
               <span className="text-xs text-red-500 font-normal">{lang === "th" ? "* จำเป็นต้องกรอก" : "* Required"}</span>
             </h3>
             <div className="space-y-3 text-sm">
+
+              {/* Claim Number */}
               <div>
                 <label className="text-xs font-semibold text-slate-700">
                   {t.analyze.claimNum} <span className="text-red-500 font-bold">*</span>
@@ -137,6 +339,8 @@ export default function AnalyzePage() {
                   className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md font-mono text-xs focus:ring-2 focus:ring-[#0071e3]"
                 />
               </div>
+
+              {/* Policy Holder */}
               <div>
                 <label className="text-xs font-semibold text-slate-700">
                   {t.analyze.policyHolder} <span className="text-red-500 font-bold">*</span>
@@ -148,29 +352,95 @@ export default function AnalyzePage() {
                   className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-[#0071e3]"
                 />
               </div>
+
+              {/* Make (required) */}
               <div>
-                <label className="text-xs font-semibold text-slate-600">{t.analyze.vehicle}</label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <input
+                <label className="text-xs font-semibold text-slate-700">
+                  {lang === "th" ? "ยี่ห้อรถ" : "Make"} <span className="text-red-500 font-bold">*</span>
+                </label>
+                <div className="mt-1">
+                  <BrandCombobox
                     value={meta.vehicleMake}
-                    onChange={(e) => setMeta({ ...meta, vehicleMake: e.target.value })}
-                    placeholder="Toyota"
-                    className="px-3 py-2 border border-slate-200 rounded-md text-xs"
-                  />
-                  <input
-                    value={meta.vehicleModel}
-                    onChange={(e) => setMeta({ ...meta, vehicleModel: e.target.value })}
-                    placeholder="Camry"
-                    className="px-3 py-2 border border-slate-200 rounded-md text-xs"
+                    lang={lang}
+                    onChange={(v) => setMeta((m) => ({ ...m, vehicleMake: v, vehicleModel: v !== m.vehicleMake ? "" : m.vehicleModel }))}
                   />
                 </div>
+              </div>
+
+              {/* Model (required) */}
+              <div>
+                <label className="text-xs font-semibold text-slate-700">
+                  {lang === "th" ? "รุ่นรถ" : "Model"} <span className="text-red-500 font-bold">*</span>
+                </label>
+                <div className="mt-1">
+                  <ModelCombobox
+                    value={meta.vehicleModel}
+                    make={meta.vehicleMake}
+                    lang={lang}
+                    onChange={(v, bodyStyle) => setMeta((m) => ({
+                      ...m,
+                      vehicleModel: v,
+                      vehicleBodyType: bodyStyle ?? m.vehicleBodyType,
+                    }))}
+                  />
+                </div>
+              </div>
+
+              {/* Year + Body Type */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    {lang === "th" ? "ปีรถ" : "Year"}
+                  </label>
+                  <input
+                    type="number"
+                    min="1990"
+                    max="2099"
+                    value={meta.vehicleYear}
+                    onChange={(e) => setMeta({ ...meta, vehicleYear: e.target.value })}
+                    placeholder={String(new Date().getFullYear())}
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md text-xs focus:ring-2 focus:ring-[#0071e3]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    {lang === "th" ? "ประเภทตัวถัง" : "Body Type"}
+                  </label>
+                  <select
+                    value={meta.vehicleBodyType}
+                    onChange={(e) => setMeta({ ...meta, vehicleBodyType: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md text-xs bg-white focus:ring-2 focus:ring-[#0071e3]"
+                  >
+                    <option value="">{lang === "th" ? "— เลือก —" : "— Select —"}</option>
+                    {BODY_TYPES.map((bt) => (
+                      <option key={bt.value} value={bt.value}>{bt.th}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* License Plate */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600">
+                  {lang === "th" ? "ทะเบียนรถ" : "License Plate"}
+                </label>
                 <input
                   value={meta.licensePlate}
                   onChange={(e) => setMeta({ ...meta, licensePlate: e.target.value })}
-                  placeholder={lang === "th" ? "ทะเบียนรถ (เช่น กข-1234)" : "License Plate (e.g. ABC-123)"}
-                  className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-md text-xs"
+                  placeholder={lang === "th" ? "กข-1234" : "ABC-123"}
+                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md text-xs focus:ring-2 focus:ring-[#0071e3]"
                 />
               </div>
+
+              {/* VIN */}
+              <VinField
+                value={meta.vinNumber}
+                onChange={(v) => setMeta({ ...meta, vinNumber: v })}
+                make={meta.vehicleMake}
+                year={meta.vehicleYear}
+                lang={lang}
+              />
+
             </div>
           </div>
 
@@ -235,7 +505,39 @@ export default function AnalyzePage() {
       </div>
 
       {result && (
-        <div className="mt-10">
+        <div className="mt-10 space-y-4">
+
+          {/* Vehicle conflict warning banner */}
+          {(makeMismatch || plateMismatch) && (
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex gap-3">
+              <span className="text-amber-500 text-xl leading-none mt-0.5">⚠️</span>
+              <div className="space-y-1.5 text-sm">
+                <p className="font-bold text-amber-900">
+                  {lang === "th" ? "พบความขัดแย้งระหว่างข้อมูลที่กรอกกับภาพ — กรุณาตรวจสอบก่อนส่งรายงาน" : "Data conflict detected — please verify before submitting"}
+                </p>
+                {makeMismatch && (
+                  <p className="text-amber-800 text-xs">
+                    {lang === "th"
+                      ? `ยี่ห้อรถ: กรอก "${meta.vehicleMake}" แต่ AI ตรวจพบ "${detectedMakeExample}" ในภาพ`
+                      : `Make: entered "${meta.vehicleMake}" but AI detected "${detectedMakeExample}" in image`}
+                  </p>
+                )}
+                {plateMismatch && (
+                  <p className="text-amber-800 text-xs">
+                    {lang === "th"
+                      ? `ทะเบียน: กรอก "${meta.licensePlate}" แต่ AI อ่านได้ "${detectedPlateExample}" จากภาพ`
+                      : `Plate: entered "${meta.licensePlate}" but AI read "${detectedPlateExample}" from image`}
+                  </p>
+                )}
+                <p className="text-amber-600 text-xs">
+                  {lang === "th"
+                    ? "เป็นเพียงคำเตือน ไม่บล็อกการทำงาน — AI อาจอ่านโลโก้/ทะเบียนไม่ชัดในบางมุมภาพ"
+                    : "Warning only — AI may misread logos or plates in certain angles."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <DamageReportView
             results={result.results}
             previews={images.map((i) => i.preview)}
@@ -251,29 +553,20 @@ export default function AnalyzePage() {
         </div>
       )}
 
-      {/* Processing Progress Modal Popup with Percentage Bar */}
+      {/* Processing Progress Modal */}
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b132a]/70 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl space-y-6 border border-sky-100 animate-in zoom-in-95 duration-200">
-            {/* Animated AI Spinner with Center Badge */}
             <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
               <div className="absolute inset-0 rounded-full border-4 border-sky-100 border-t-[#0071e3] animate-spin" />
-              <div className="w-12 h-12 rounded-full bg-sky-50 text-2xl flex items-center justify-center shadow-inner">
-                ⚡
-              </div>
+              <div className="w-12 h-12 rounded-full bg-sky-50 text-2xl flex items-center justify-center shadow-inner">⚡</div>
             </div>
-
-            {/* Main Title & Percentage */}
             <div className="space-y-1">
               <h3 className="text-xl font-extrabold text-[#1d1d1f]">
                 {lang === "th" ? "กำลังประมวลผล..." : "Processing..."}
               </h3>
-              <div className="text-3xl font-extrabold text-[#0071e3] font-mono tracking-tight">
-                {progress}%
-              </div>
+              <div className="text-3xl font-extrabold text-[#0071e3] font-mono tracking-tight">{progress}%</div>
             </div>
-
-            {/* Smooth Dynamic Progress Bar */}
             <div className="space-y-2">
               <div className="w-full h-3 bg-sky-100 rounded-full overflow-hidden p-0.5 border border-sky-200">
                 <div
@@ -291,8 +584,6 @@ export default function AnalyzePage() {
                   : (lang === "th" ? "ประมวลผลเสร็จสิ้น 100%" : "Processing complete 100%")}
               </p>
             </div>
-
-            {/* Warning Box - DO NOT CLOSE OR LEAVE */}
             <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 flex items-start gap-3 text-left">
               <span className="text-amber-600 text-lg leading-none mt-0.5">⚠️</span>
               <div className="text-xs font-semibold text-amber-800 leading-snug">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/auditLog";
+import { hashPassword } from "@/lib/password";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,10 +34,11 @@ export async function GET() {
     });
 
     if (employees.length === 0 && defaultBranch && defaultRole) {
+      const seedPassword = await hashPassword("password123");
       await prisma.employee.createMany({
         data: [
-          { code: "EMP-001", name: "อรรถพล โชคชัย", email: "athaporn@htechnology.com", username: "athaporn", password: "password123", phone: "065-882-8333", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
-          { code: "EMP-002", name: "สมชาย ใจดี", email: "somchai@claimthunjai.com", username: "somchai", password: "password123", phone: "081-234-5678", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
+          { code: "EMP-001", name: "อรรถพล โชคชัย", email: "athaporn@htechnology.com", username: "athaporn", password: seedPassword, phone: "065-882-8333", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
+          { code: "EMP-002", name: "สมชาย ใจดี", email: "somchai@claimthunjai.com", username: "somchai", password: seedPassword, phone: "081-234-5678", branchId: defaultBranch.id, roleId: defaultRole.id, status: "active" },
         ],
       });
       const result = await prisma.employee.findMany({
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
         name,
         email,
         username,
-        password,
+        password: await hashPassword(password),
         phone: body.phone?.trim() || null,
         branchId: body.branchId || null,
         roleId: body.roleId || null,

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { LangProvider } from "@/lib/LangContext";
 import { Header } from "@/components/Header";
-import DemoBadge from "@/components/DemoBadge";
 import PortalLayout from "@/components/PortalLayout";
 
 export const metadata: Metadata = {
@@ -18,7 +17,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Header />
           <PortalLayout>{children}</PortalLayout>
         </LangProvider>
-        <DemoBadge />
       </body>
     </html>
   );

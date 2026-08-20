@@ -4,7 +4,7 @@ export const dict = {
   en: {
     brand: "ClaimThunJai",
     tagline: "AI Damage Detection for Insurance",
-    nav: { home: "Home", dashboard: "Dashboard", intake: "Intake", analyze: "Analyze", inspection: "Inspection", catalog: "Price Catalog", quotations: "Quotations", docs: "API Docs" },
+    nav: { home: "Home", dashboard: "Dashboard", analyze: "Analyze", inspection: "Inspection", catalog: "Price Catalog", quotations: "Quotations", docs: "API Docs" },
     hero: {
       eyebrow: "B2B2C • Insurance Tech",
       title: "AI that sees every dent.",
@@ -93,7 +93,7 @@ export const dict = {
   th: {
     brand: "ClaimThunJai",
     tagline: "AI ตรวจจับความเสียหายรถยนต์ สำหรับธุรกิจประกัน",
-    nav: { home: "หน้าแรก", dashboard: "แดชบอร์ด", intake: "กล่องงานเข้า", analyze: "วิเคราะห์", inspection: "ตรวจสภาพ", catalog: "ราคากลาง", quotations: "ใบเสนอราคา", docs: "API Docs" },
+    nav: { home: "หน้าแรก", dashboard: "แดชบอร์ด", analyze: "วิเคราะห์", inspection: "ตรวจสภาพ", catalog: "ราคากลาง", quotations: "ใบเสนอราคา", docs: "API Docs" },
     hero: {
       eyebrow: "B2B2C • InsurTech",
       title: "AI ที่มองเห็นทุกรอยบุบ",

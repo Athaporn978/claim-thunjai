@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 import { estimateTotal } from "@/lib/priceLookup";
+import { getSession } from "@/lib/session";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,6 +12,10 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 const MODEL = "claude-opus-5";
+
+const MAX_IMAGES_PER_REQUEST = 30;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 const SYSTEM_PROMPT = `You are an elite automotive damage assessor for an insurance company.
 You analyze photos of vehicles and detect damages with surgical precision.
@@ -20,12 +26,26 @@ CRITICAL ULTRA-SENSITIVE INSPECTION INSTRUCTIONS:
 - Do NOT ignore cosmetic paint scratches or bumper scuffs. Label any visible scratch or scuff with severity: "minor".
 - LEFT/RIGHT ORIENTATION: Always determine "left" and "right" from the viewer's perspective looking AT the photo (i.e. as the part appears on your screen), NOT from the driver's seat perspective. A dent on the side of the car closest to the left edge of the image is the "left" side/part.
 
+VEHICLE CONFLICT DETECTION:
+When the user provides vehicle context (make, plate), compare it with what you see in the image:
+- "detectedMake": the brand you identify from logo, badge, or distinctive design. null if unrecognizable.
+- "makeMatch": true if your detected make matches the registered make (case-insensitive, brand-family level). false if clearly a different brand. null if you cannot determine the make from this image.
+- "detectedPlate": read any license plate text visible in the image exactly as shown. null if not visible or unreadable.
+- "plateMatch": always return null — the server will compute this from detectedPlate.
+Always include "vehicleConflict" in every response, even if no context was provided (set all fields to null in that case).
+
 For EACH image, identify every visible damage and return ONLY a JSON object with this exact shape:
 {
   "vehicleMake": "Toyota|BMW|Skoda|...",
   "vehicleColor": "white|black|...",
   "angle": "front|rear|left|right|front-left|front-right|rear-left|rear-right|interior|other",
   "overallSeverity": "minor|moderate|severe|total_loss",
+  "vehicleConflict": {
+    "detectedMake": "Honda",
+    "makeMatch": true,
+    "detectedPlate": "กข-1234",
+    "plateMatch": null
+  },
   "damages": [
     {
       "part": "Rear Bumper",
@@ -53,6 +73,13 @@ If NO damage is visible at all after examining carefully, return damages: [] and
 
 Return ONLY the JSON object, no markdown fences, no commentary.`;
 
+type VehicleConflict = {
+  detectedMake?: string | null;
+  makeMatch?: boolean | null;
+  detectedPlate?: string | null;
+  plateMatch?: boolean | null;
+};
+
 type AnalyzeBody = {
   images: { data: string; mediaType: string }[];
   claimNumber?: string;
@@ -60,19 +87,63 @@ type AnalyzeBody = {
   policyHolder?: string;
   vehicleMake?: string;
   vehicleModel?: string;
+  vehicleYear?: string;
+  vehicleBodyType?: string;
   licensePlate?: string;
 };
 
+// Strip non-alphanumeric (including Thai letters) for plate comparison
+function normalizePlate(plate: string): string {
+  return (plate || "").replace(/[^a-zA-Zก-ฮ0-9]/g, "").toLowerCase();
+}
+
 export async function POST(req: NextRequest) {
   try {
+    // proxy.ts already guarantees a valid session for this route, but re-verify
+    // here since we need the identity to key the rate limiter.
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rl = checkRateLimit(`analyze:${session.id}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    if (!rl.allowed) {
+      const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: `ใช้งานบ่อยเกินไป กรุณารอ ${retryAfterSec} วินาทีแล้วลองใหม่ (จำกัด ${RATE_LIMIT_MAX_REQUESTS} ครั้ง / 5 นาที)` },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+      );
+    }
+
     const body = (await req.json()) as AnalyzeBody;
     if (!body.images?.length) {
       return NextResponse.json({ error: "No images provided" }, { status: 400 });
     }
+    if (body.images.length > MAX_IMAGES_PER_REQUEST) {
+      return NextResponse.json(
+        { error: `อัปโหลดได้สูงสุด ${MAX_IMAGES_PER_REQUEST} รูปต่อครั้ง (ส่งมา ${body.images.length} รูป)` },
+        { status: 400 },
+      );
+    }
+
+    // Build vehicle context string to pass to the AI
+    const contextParts = [
+      body.vehicleMake && `Make: ${body.vehicleMake}`,
+      body.vehicleModel && `Model: ${body.vehicleModel}`,
+      body.vehicleYear && `Year: ${body.vehicleYear}`,
+      body.vehicleBodyType && `BodyType: ${body.vehicleBodyType}`,
+      body.licensePlate && body.licensePlate.trim() !== "-" && `Plate: ${body.licensePlate}`,
+    ].filter(Boolean);
+    const vehicleContext = contextParts.length
+      ? `Vehicle registered by inspector: ${contextParts.join(", ")}\n\n`
+      : "";
+
+    const userPlateNorm = normalizePlate(body.licensePlate || "");
+    const userPlateProvided = userPlateNorm.length > 0;
 
     const severityRank = { minor: 0, moderate: 1, severe: 2, total_loss: 3 } as const;
 
-    async function analyzeOne(img: { data: string; mediaType: string }, index: number): Promise<Record<string, unknown>> {
+    async function analyzeOne(img: { data: string; mediaType: string }): Promise<Record<string, unknown>> {
       try {
         const msg = await client.messages.create({
           model: MODEL,
@@ -90,7 +161,10 @@ export async function POST(req: NextRequest) {
                     data: img.data,
                   },
                 },
-                { type: "text", text: "Analyze this vehicle image for any damage or scratches. Return the JSON object only." },
+                {
+                  type: "text",
+                  text: `${vehicleContext}Analyze this vehicle image for any damage or scratches. Compare the visible make/brand and license plate (if visible) with the registered vehicle info above. Return the JSON object only.`,
+                },
               ],
             },
           ],
@@ -107,14 +181,25 @@ export async function POST(req: NextRequest) {
           const jsonStr = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
           parsed = JSON.parse(jsonStr);
         } catch {
-          parsed = { overallSeverity: "minor", damages: [] };
+          parsed = { overallSeverity: "minor", damages: [], vehicleConflict: { detectedMake: null, makeMatch: null, detectedPlate: null, plateMatch: null } };
         }
+
+        // Compute plateMatch server-side (AI always returns plateMatch: null)
+        const conflict = (parsed.vehicleConflict || {}) as VehicleConflict;
+        const detectedPlateNorm = normalizePlate(conflict.detectedPlate || "");
+        if (userPlateProvided && detectedPlateNorm) {
+          conflict.plateMatch = userPlateNorm === detectedPlateNorm;
+        } else {
+          conflict.plateMatch = null;
+        }
+        parsed.vehicleConflict = conflict;
 
         const damages = (parsed.damages as Array<{ part: string; partTh?: string; severity: "minor" | "moderate" | "severe" }>) || [];
         if (damages.length > 0) {
           const est = await estimateTotal(damages, {
             make: body.vehicleMake || (parsed.vehicleMake as string | undefined),
             model: body.vehicleModel,
+            bodyType: body.vehicleBodyType,
           });
           parsed.damages = damages.map((d, i) => ({ ...d, priceEstimate: est.items[i] }));
           parsed.totalEstimate = { low: est.totalLow, high: est.totalHigh, matchedCount: est.matchedCount, totalCount: est.totalCount };
@@ -128,12 +213,13 @@ export async function POST(req: NextRequest) {
           angle: "other",
           overallSeverity: "minor",
           damages: [],
+          vehicleConflict: { detectedMake: null, makeMatch: null, detectedPlate: null, plateMatch: null },
         };
       }
     }
 
     const results: Array<Record<string, unknown>> = await Promise.all(
-      body.images.map((img, idx) => analyzeOne(img, idx))
+      body.images.map((img) => analyzeOne(img))
     );
 
     let worstSeverity: "minor" | "moderate" | "severe" | "total_loss" = "minor";
