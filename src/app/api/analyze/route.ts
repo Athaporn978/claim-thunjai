@@ -13,7 +13,7 @@ const client = new Anthropic({
 });
 const MODEL = "claude-opus-5";
 
-const MAX_IMAGES_PER_REQUEST = 30;
+const MAX_IMAGES_PER_REQUEST = 50;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 

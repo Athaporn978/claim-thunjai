@@ -9,8 +9,8 @@ export default function LoginPage() {
   const { lang, setLang } = useLang();
   const router = useRouter();
 
-  const [email, setEmail] = useState("athaporn@htechnology.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");

@@ -588,7 +588,7 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
                 <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
               </div>
               <div>
-                <div className="font-bold text-[var(--navy-900)]">ClaimThunJai</div>
+                <div className="font-bold text-[var(--navy-900)]">H Technology And Services</div>
                 <div className="text-[10px] text-slate-400">{lang === "th" ? "ใบสรุปการควบคุมราคาซ่อม" : "Repair Price Control Report"}</div>
               </div>
             </div>

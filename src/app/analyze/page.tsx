@@ -5,10 +5,11 @@ import { DamageReportView, type AnalyzeResult } from "@/components/DamageReportV
 import { signature, isDuplicate, type ImgSig } from "@/lib/imageHash";
 import { validateVin } from "@/lib/vinValidation";
 import { BRANDS } from "@/lib/carCatalog";
+import { compressImageToBase64 } from "@/lib/imageCompress";
 
 type UploadedImage = { file: File; preview: string; base64: string; mediaType: string; sig: ImgSig };
 
-const MAX_IMAGES = 30; // must match MAX_IMAGES_PER_REQUEST in /api/analyze/route.ts
+const MAX_IMAGES = 50; // must match MAX_IMAGES_PER_REQUEST in /api/analyze/route.ts
 
 // Top brands pinned at the top of the dropdown (Thai market priority)
 const TOP_BRAND_NAMES = [
@@ -224,12 +225,8 @@ export default function AnalyzePage() {
       const sig = await signature(file);
       if (isDuplicate(sig, seen)) { skipped++; continue; }
       if (sig.hash) seen.push(sig);
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(",")[1]);
-        reader.readAsDataURL(file);
-      });
-      next.push({ file, preview: URL.createObjectURL(file), base64, mediaType: file.type, sig });
+      const { data: base64, mediaType } = await compressImageToBase64(file);
+      next.push({ file, preview: URL.createObjectURL(file), base64, mediaType, sig });
     }
     setImages((prev) => [...prev, ...next]);
     if (skipped > 0) {

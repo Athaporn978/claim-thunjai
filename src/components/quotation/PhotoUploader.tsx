@@ -1,6 +1,7 @@
 "use client";
 import { useRef } from "react";
 import type { QuotationPhoto } from "@/lib/quotation";
+import { compressImageToDataUrl } from "@/lib/imageCompress";
 
 export function PhotoUploader({
   photos,
@@ -12,17 +13,21 @@ export function PhotoUploader({
   lang: "th" | "en";
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const MAX_PHOTOS = 50;
 
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
     const next: QuotationPhoto[] = [];
     for (const file of Array.from(files)) {
+      if (photos.length + next.length >= MAX_PHOTOS) break;
       if (!file.type.startsWith("image/") && file.type !== "application/pdf" && !file.name.endsWith(".pdf")) continue;
-      const url = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+      const url = file.type.startsWith("image/")
+        ? await compressImageToDataUrl(file)
+        : await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
       next.push({ url, caption: file.name });
     }
     onChange([...photos, ...next]);
@@ -53,7 +58,7 @@ export function PhotoUploader({
           {lang === "th" ? "ลากรูปภาพ หรือ ไฟล์ PDF มาวางที่นี่ หรือคลิกเพื่ออัปโหลด" : "Drop photos or PDF files here, or click to upload"}
         </div>
         <div className="text-xs text-slate-500 mt-1">
-          {lang === "th" ? "เพิ่มได้ไม่จำกัด · JPEG / PNG / WebP / PDF" : "Unlimited · JPEG / PNG / WebP / PDF"}
+          {lang === "th" ? `เพิ่มได้สูงสุด ${MAX_PHOTOS} ไฟล์ · JPEG / PNG / WebP / PDF` : `Up to ${MAX_PHOTOS} files · JPEG / PNG / WebP / PDF`}
         </div>
       </div>
 

@@ -36,6 +36,20 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // src/proxy.ts buffers the request body for every /api/* call (needed to read
+    // the session cookie before the route handler runs). Next.js's default buffer
+    // cap is 10MB — quotations with several scanned-PDF pages or photos embedded
+    // as base64 data: URIs regularly exceed that, silently truncating the JSON
+    // body and failing the save.
+    //
+    // Photos are now compressed client-side before upload (src/lib/imageCompress.ts,
+    // 2400px/85% JPEG — measured ~0.95MB worst-case per photo on dense/noisy real
+    // content). At the business-required cap of 50 photos/case that's up to ~47.5MB
+    // raw, ~65MB once base64-encoded (+37% overhead) — 100mb leaves real headroom
+    // above that worst case while still bounding memory use per request (not unlimited).
+    proxyClientMaxBodySize: "100mb",
+  },
   async headers() {
     return [
       {

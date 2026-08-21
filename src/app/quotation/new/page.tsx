@@ -8,6 +8,7 @@ import { BRANDS } from "@/lib/carCatalog";
 import { totals, fmtBaht, type QuotationInput, type QuotationItemInput, type QuotationPhoto, type ItemType } from "@/lib/quotation";
 import { useSidebar } from "@/lib/SidebarContext";
 import { validateVin } from "@/lib/vinValidation";
+import { compressImageToBase64 } from "@/lib/imageCompress";
 
 const EMPTY: QuotationInput = {
   status: "draft",
@@ -334,21 +335,30 @@ function Wizard() {
       const fileArray: { data: string; mediaType: string; name: string }[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const res = reader.result as string;
-            const base64Data = res.split(",")[1] || res;
-            resolve(base64Data);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        fileArray.push({
-          data: base64,
-          mediaType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
-          name: file.name,
-        });
+        // Images are resized/re-encoded client-side before ever becoming base64 —
+        // uncompressed phone photos (3-8MB each) were blowing past the request
+        // body-size cap once a case had several of them, silently corrupting the
+        // save. PDFs pass through untouched (can't canvas-compress a PDF).
+        if (file.type.startsWith("image/")) {
+          const { data, mediaType } = await compressImageToBase64(file);
+          fileArray.push({ data, mediaType, name: file.name });
+        } else {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const res = reader.result as string;
+              const base64Data = res.split(",")[1] || res;
+              resolve(base64Data);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          fileArray.push({
+            data: base64,
+            mediaType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
+            name: file.name,
+          });
+        }
       }
 
       const res = await fetch("/api/extract-quote", {
