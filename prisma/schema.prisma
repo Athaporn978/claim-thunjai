@@ -173,6 +173,7 @@ model Quotation {
   totalQuoted     Float @default(0)
   totalControlled Float @default(0)
   totalSaving     Float @default(0)
+  includeVat      Boolean @default(true) // whether the approval report/PDF adds VAT 7%
 
   // Approval & SLA Tracking
   approvedAt DateTime?

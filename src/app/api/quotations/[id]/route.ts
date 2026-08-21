@@ -66,6 +66,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         totalQuoted: t.totalQuoted,
         totalControlled: t.totalControlled,
         totalSaving: t.totalSaving,
+        includeVat: body.includeVat ?? true,
         items: {
           create: (body.items || []).map((i, idx) => ({
             type: i.type,
