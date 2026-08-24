@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type QuotationItemInput,
   type ItemType,
@@ -10,6 +10,58 @@ import {
   fmtBaht,
 } from "@/lib/quotation";
 import { StandardPricePicker } from "./StandardPricePicker";
+
+// Keeps its own draft string while focused so typing a new value never fights the
+// parent's reformatted (e.g. .toFixed(2)) display — the classic "must delete digits
+// first" complaint. Only reformats from the parent value on blur or external changes.
+function NumberCell({
+  value,
+  onChange,
+  className,
+  placeholder,
+  decimals,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  className: string;
+  placeholder: string;
+  decimals?: number;
+}) {
+  const format = (n: number) => (n === 0 ? "" : decimals != null ? n.toFixed(decimals) : String(n));
+  const [local, setLocal] = useState(() => format(value));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setLocal(format(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, decimals]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={local}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v === "" || /^\d*\.?\d*$/.test(v)) {
+          setLocal(v);
+          const n = parseFloat(v);
+          onChange(Number.isNaN(n) ? 0 : n);
+        }
+      }}
+      onBlur={() => {
+        focused.current = false;
+        const n = parseFloat(local) || 0;
+        setLocal(format(n));
+      }}
+      className={className}
+      placeholder={placeholder}
+    />
+  );
+}
 
 export function ItemsTable({
   title,
@@ -59,8 +111,6 @@ export function ItemsTable({
     });
     onChange(next);
   };
-
-  const num = (v: number) => (v === 0 ? "" : String(v));
 
   const inputCls = "w-full min-w-[65px] px-1.5 py-1 text-xs sm:text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-[#0071e3]";
   const qtyInputCls = "w-12 px-1 py-1 text-xs text-center border border-slate-200 rounded focus:outline-none focus:border-[#0071e3] font-mono font-semibold";
@@ -180,23 +230,18 @@ export function ItemsTable({
 
                     {/* Pre-Control Columns (Cool Slate Tinted Inputs & Total) */}
                     <td className="px-1 py-2.5 bg-slate-50/50">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={r.quotedUnit === 0 ? "" : r.quotedUnit.toFixed(2)}
-                        onChange={(e) => updateRow(idx, { quotedUnit: parseFloat(e.target.value) || 0 })}
+                      <NumberCell
+                        value={r.quotedUnit}
+                        onChange={(v) => updateRow(idx, { quotedUnit: v })}
+                        decimals={2}
                         className={`${inputCls} font-mono bg-white border-slate-300 text-slate-800 font-medium focus:border-slate-500`}
                         placeholder="0.00"
                       />
                     </td>
                     <td className="px-1 py-2.5 bg-slate-50/50">
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        value={num(r.quotedQty)}
-                        onChange={(e) => updateRow(idx, { quotedQty: parseFloat(e.target.value) || 0 })}
+                      <NumberCell
+                        value={r.quotedQty}
+                        onChange={(v) => updateRow(idx, { quotedQty: v })}
                         className={`${qtyInputCls} bg-white border-slate-300 text-slate-800`}
                         placeholder="1"
                       />
@@ -205,12 +250,10 @@ export function ItemsTable({
 
                     {/* Post-Control Columns (Royal Blue Focus Elevated Section) */}
                     <td className="px-1 py-2.5 bg-[#f0f7ff]">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={r.controlledUnit === 0 ? "" : r.controlledUnit.toFixed(2)}
-                        onChange={(e) => updateRow(idx, { controlledUnit: parseFloat(e.target.value) || 0, agreeWithStandard: false })}
+                      <NumberCell
+                        value={r.controlledUnit}
+                        onChange={(v) => updateRow(idx, { controlledUnit: v, agreeWithStandard: false })}
+                        decimals={2}
                         className={`${inputCls} font-mono !bg-white !border-2 !border-[#0071e3] font-extrabold text-[#0071e3] focus:ring-2 focus:ring-blue-200 shadow-xs`}
                         placeholder="0.00"
                       />
@@ -223,12 +266,9 @@ export function ItemsTable({
                       </button>
                     </td>
                     <td className="px-1 py-2.5 text-center bg-[#f0f7ff]">
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        value={num(r.controlledQty)}
-                        onChange={(e) => updateRow(idx, { controlledQty: parseFloat(e.target.value) || 0 })}
+                      <NumberCell
+                        value={r.controlledQty}
+                        onChange={(v) => updateRow(idx, { controlledQty: v })}
                         className={`${qtyInputCls} !bg-white !border-2 !border-[#0071e3] text-[#0071e3] font-bold`}
                         placeholder="1"
                       />

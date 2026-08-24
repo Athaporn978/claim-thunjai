@@ -119,6 +119,8 @@ function Wizard() {
   const sp = useSearchParams();
   const editId = sp.get("id");
   const [form, setForm] = useState<QuotationInput>(EMPTY);
+  const [insurerCustom, setInsurerCustom] = useState(false);
+  const [centerCustom, setCenterCustom] = useState(false);
   const [step, setStep] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -781,15 +783,17 @@ function Wizard() {
                 value={
                   TOP_INSURERS.some((i) => form.insurerName?.includes(i.v))
                     ? TOP_INSURERS.find((i) => form.insurerName?.includes(i.v))?.v
-                    : form.insurerName
+                    : insurerCustom || form.insurerName
                     ? "custom"
                     : ""
                 }
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === "custom") {
+                    setInsurerCustom(true);
                     set("insurerName", "");
                   } else {
+                    setInsurerCustom(false);
                     set("insurerName", val);
                   }
                 }}
@@ -801,7 +805,7 @@ function Wizard() {
                 ))}
                 <option value="custom">{lang === "th" ? "— อื่นๆ (กรอกระบุเอง) —" : "— Other (Specify) —"}</option>
               </select>
-              {(!TOP_INSURERS.some((i) => form.insurerName?.includes(i.v)) && form.insurerName !== null) && (
+              {(!TOP_INSURERS.some((i) => form.insurerName?.includes(i.v)) && (insurerCustom || form.insurerName)) && (
                 <input
                   type="text"
                   value={form.insurerName ?? ""}
@@ -833,15 +837,17 @@ function Wizard() {
                 value={
                   MOCK_CENTERS.some((c) => form.centerName?.includes(c.name))
                     ? MOCK_CENTERS.find((c) => form.centerName?.includes(c.name))?.name
-                    : form.centerName
+                    : centerCustom || form.centerName
                     ? "custom"
                     : ""
                 }
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === "custom") {
+                    setCenterCustom(true);
                     set("centerName", "");
                   } else {
+                    setCenterCustom(false);
                     const found = MOCK_CENTERS.find((c) => c.name === val);
                     if (found) {
                       set("centerName", found.name);
@@ -861,7 +867,7 @@ function Wizard() {
                 <option value="custom">{lang === "th" ? "— อื่นๆ (กรอกระบุเอง) —" : "— Other (Specify) —"}</option>
               </select>
 
-              {(!MOCK_CENTERS.some((c) => form.centerName?.includes(c.name)) && form.centerName !== null && form.centerName !== "") && (
+              {(!MOCK_CENTERS.some((c) => form.centerName?.includes(c.name)) && (centerCustom || form.centerName)) && (
                 <input
                   type="text"
                   value={form.centerName ?? ""}

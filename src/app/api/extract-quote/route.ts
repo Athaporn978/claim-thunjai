@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
                       namePart = namePart.substring(0, qtyMatch.index).trim();
                     }
                     if (namePart.length >= 2) {
-                      const isLabor = lineStr.includes("เคาะ") || lineStr.includes("พ่นสี") || lineStr.includes("ซ่อม") || lineStr.includes("ถอด") || lineStr.includes("ยก") || lineStr.includes("ค่าแรง") || lineStr.includes("เปลี่ยน");
+                      const isLabor = lineStr.includes("เคาะ") || lineStr.includes("พ่นสี") || lineStr.includes("ซ่อม") || lineStr.includes("ถอด") || lineStr.includes("ยก") || lineStr.includes("ค่าแรง") || lineStr.includes("เปลี่ยน") || lineStr.includes("ขัด") || lineStr.includes("ทำสี") || lineStr.includes("ปะผุ") || lineStr.includes("เคาะสี");
                       items.push({ type: isLabor ? "labor" : "part", name: namePart, qty, unitPrice: rawPrice });
                     }
                   }
