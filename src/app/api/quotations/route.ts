@@ -10,7 +10,24 @@ export async function GET() {
   try {
     const rows = await prisma.quotation.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { items: true } }, branch: true },
+      select: {
+        id: true,
+        quotationNo: true,
+        status: true,
+        customerName: true,
+        licensePlate: true,
+        vehicleBrand: true,
+        insurerName: true,
+        claimNo: true,
+        totalQuoted: true,
+        totalControlled: true,
+        totalSaving: true,
+        createdByName: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { items: true } },
+        branch: { select: { name: true } },
+      },
     });
 
     return NextResponse.json({ quotations: rows });

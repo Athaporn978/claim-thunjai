@@ -822,7 +822,7 @@ function Wizard() {
             <Field label={lang === "th" ? "ทุนประกัน" : "Sum Insured"} value={form.sumInsured} onChange={setNum("sumInsured")} type="number" />
             <Field label={lang === "th" ? "วันที่เริ่มคุ้มครอง" : "Coverage Start"} value={form.coverageStart} onChange={(v) => set("coverageStart", v)} type="date" />
             <Field label={lang === "th" ? "วันที่สิ้นสุดคุ้มครอง" : "Coverage End"} value={form.coverageEnd} onChange={(v) => set("coverageEnd", v)} type="date" />
-            <Field label={lang === "th" ? "ค่าเสียหายส่วนแรก (Deductible)" : "Deductible"} value={form.deductible} onChange={setNum("deductible")} type="number" />
+            <Field label={lang === "th" ? "ค่าเสียหายส่วนแรก (Deductible / Excess)" : "Deductible / Excess"} value={form.deductible} onChange={setNum("deductible")} type="number" />
           </div>
         )}
 
