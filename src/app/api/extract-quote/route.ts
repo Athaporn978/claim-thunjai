@@ -235,7 +235,9 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
         const response = await anthropic.messages.create(
           {
             model: "claude-sonnet-5",
-            max_tokens: 4096,
+            // Some real quotations run close to 100 repair line items — give the
+            // JSON response enough headroom that it doesn't get cut off mid-array.
+            max_tokens: 16000,
             messages: [{ role: "user", content: contentParts }],
           },
           {
