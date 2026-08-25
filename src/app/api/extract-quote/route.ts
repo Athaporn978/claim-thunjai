@@ -138,6 +138,17 @@ export async function POST(req: NextRequest) {
                 }
               });
 
+              // Side-by-side two-column tables (ค่าแรง | ค่าอะไหล่) land on the same text
+              // line, so a "line" here can actually be two unrelated items concatenated
+              // together — the price-at-end regex above then grabs the wrong item's name.
+              // A price number embedded mid-name (not just at the very end, already
+              // stripped) is the telltale sign of that concatenation. Reject the whole
+              // batch rather than silently keep half-merged rows — falls through to AI
+              // Vision below, which reads the columns correctly.
+              const hasCorruptedItem = items.some(
+                (it) => /\d,\d{3}/.test(it.name) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(it.name)
+              );
+
               parsedResult = {
                 customerName: customer || null,
                 licensePlate: plate || null,
@@ -152,7 +163,7 @@ export async function POST(req: NextRequest) {
                 policyNo: policy || null,
                 policyType: "ชั้น 1",
                 centerName: center || null,
-                items: items.length > 0 ? items : undefined,
+                items: items.length > 0 && !hasCorruptedItem ? items : undefined,
               };
               break;
             }
@@ -232,12 +243,22 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
 
         contentParts.push({ type: "text", text: promptText });
 
-        const response = await anthropic.messages.create(
+        // Some real quotations run 200+ repair line items across dozens of scanned
+        // pages — give the JSON response enough headroom that it doesn't get cut off
+        // mid-array. Extended thinking is off: for a multi-page scanned document this
+        // model spends the vast majority of max_tokens on invisible reasoning (measured
+        // ~91% on a 277-item/31-page case), leaving almost nothing for the actual JSON
+        // and guaranteeing truncation no matter how high max_tokens is raised. We don't
+        // need visible reasoning here, just the extracted data, so disabling it routes
+        // the whole budget to output. A max_tokens this high makes the Anthropic SDK
+        // require streaming (it refuses a plain non-streaming call it estimates could
+        // run past 10 minutes), which also sidesteps any single-request timeout on our
+        // own infra — verified end-to-end at ~125s for the 277-item/31-page case.
+        const stream = anthropic.messages.stream(
           {
             model: "claude-sonnet-5",
-            // Some real quotations run close to 100 repair line items — give the
-            // JSON response enough headroom that it doesn't get cut off mid-array.
-            max_tokens: 16000,
+            max_tokens: 32000,
+            thinking: { type: "disabled" },
             messages: [{ role: "user", content: contentParts }],
           },
           {
@@ -246,6 +267,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
             },
           }
         );
+        const response = await stream.finalMessage();
 
         const respText = response.content
           .filter((c): c is Anthropic.TextBlock => c.type === "text")
