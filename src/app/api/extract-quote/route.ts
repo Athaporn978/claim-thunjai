@@ -138,15 +138,27 @@ export async function POST(req: NextRequest) {
                 }
               });
 
-              // Side-by-side two-column tables (ค่าแรง | ค่าอะไหล่) land on the same text
-              // line, so a "line" here can actually be two unrelated items concatenated
-              // together — the price-at-end regex above then grabs the wrong item's name.
-              // A price number embedded mid-name (not just at the very end, already
-              // stripped) is the telltale sign of that concatenation. Reject the whole
-              // batch rather than silently keep half-merged rows — falls through to AI
-              // Vision below, which reads the columns correctly.
+              // Path 1's line/regex parser has no real understanding of the document —
+              // it has repeatedly produced confident-looking but wrong "items" from
+              // things that aren't item tables at all:
+              //  - Side-by-side two-column tables (ค่าแรง | ค่าอะไหล่) land on the same
+              //    text line, so a "line" can be two unrelated items concatenated
+              //    together, with a price number embedded mid-name instead of at the end.
+              //  - A scanned/photographed page with no real text layer can still carry a
+              //    stray watermark or reference-code stamp (e.g. "CT1705487387") as its
+              //    only extractable text; the price-at-end regex happily reads that as
+              //    one absurdly-priced item, e.g. name "CT" at ฿1,705,487,387.
+              // Every real line item in this business is a Thai repair/part description
+              // (see AGENTS.md), so requiring at least one Thai character is a strong,
+              // domain-specific signal that catches both failure classes (and any future
+              // stray non-Thai text) without enumerating each corruption pattern by hand.
+              // Reject the whole batch rather than keep a partial/wrong result — falls
+              // through to AI Vision below, which reads the actual document content.
               const hasCorruptedItem = items.some(
-                (it) => /\d,\d{3}/.test(it.name) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(it.name)
+                (it) =>
+                  /\d,\d{3}/.test(it.name) ||
+                  /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(it.name) ||
+                  !/[฀-๿]/.test(it.name)
               );
 
               parsedResult = {
