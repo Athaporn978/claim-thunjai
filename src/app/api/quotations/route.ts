@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
           centerAddress: body.centerAddress ?? null,
           centerContact: body.centerContact ?? null,
           vehicleSize: body.vehicleSize || "B",
+          officerComment: body.officerComment ?? null,
           photos: body.photos && body.photos.length ? JSON.stringify(body.photos) : null,
           totalQuoted: t.totalQuoted,
           totalControlled: t.totalControlled,

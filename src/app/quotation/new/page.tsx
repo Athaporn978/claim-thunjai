@@ -829,7 +829,6 @@ function Wizard() {
               )}
             </div>
             <Field label={lang === "th" ? "หมายเลขเคลม" : "Claim No."} value={form.claimNo} onChange={(v) => set("claimNo", v)} required />
-            <Field label={lang === "th" ? "ประเภทยานพาหนะ" : "Vehicle Type"} value={form.insVehicleType} onChange={(v) => set("insVehicleType", v)} />
             <Field label={lang === "th" ? "หมายเลขกรมธรรม์" : "Policy No."} value={form.policyNo} onChange={(v) => set("policyNo", v)} />
             <Field label={lang === "th" ? "ประเภทกรมธรรม์" : "Policy Type"} value={form.policyType} onChange={(v) => set("policyType", v)} placeholder={lang === "th" ? "ชั้น 1" : "Type 1"} />
             <Field label={lang === "th" ? "ทุนประกัน" : "Sum Insured"} value={form.sumInsured} onChange={setNum("sumInsured")} type="number" />
@@ -1042,6 +1041,28 @@ function Wizard() {
                 </div>
               );
             })()}
+
+            {/* Officer note — last thing filled before finalising, and printed
+                above the Approval Summary so the insurer sees the reasoning. */}
+            <div className="border-t border-slate-200 pt-6">
+              <label className="block text-sm font-bold text-[var(--navy-900)] mb-1.5">
+                💬 {lang === "th" ? "ความเห็นเจ้าหน้าที่คุมราคา" : "Officer's Comment"}
+              </label>
+              <p className="text-xs text-slate-500 font-medium mb-2">
+                {lang === "th"
+                  ? "ข้อความนี้จะแสดงในใบรายงาน PDF เหนือส่วนสรุปผลการพิจารณา (ไม่บังคับกรอก)"
+                  : "Shown on the printed report above the Approval Summary. Optional."}
+              </p>
+              <textarea
+                value={form.officerComment ?? ""}
+                onChange={(e) => set("officerComment", e.target.value)}
+                rows={4}
+                placeholder={lang === "th"
+                  ? "เช่น เหตุผลการปรับลดราคา ข้อตกลงกับศูนย์บริการ หรือข้อสังเกตเพิ่มเติม…"
+                  : "e.g. reasons for the price adjustments, agreements with the service centre, other notes…"}
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm leading-relaxed focus:outline-none focus:border-[#0071e3] resize-y"
+              />
+            </div>
           </div>
         )}
       </div>

@@ -50,6 +50,8 @@ export type QuotationInput = {
   discountPercent?: number;
   discountAmount?: number;
   includeVat?: boolean;
+  // officer note shown above the Approval Summary on the printed report
+  officerComment?: string | null;
   // ctx
   vehicleSize?: string;
   photos?: QuotationPhoto[];

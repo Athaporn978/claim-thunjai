@@ -169,6 +169,10 @@ model Quotation {
   // Vehicle photos — JSON array of { url(dataURL), caption? }
   photos String?
 
+  /// Free-text note the price-control officer writes before finalising the case.
+  /// Rendered above the Approval Summary on the printed report when present.
+  officerComment String?
+
   // Denormalized totals (for list display)
   totalQuoted     Float @default(0)
   totalControlled Float @default(0)

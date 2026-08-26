@@ -9,6 +9,7 @@ type Quotation = {
   customerName: string | null; licensePlate: string | null; vehicleCategory: string | null;
   vehicleBrand: string | null; vehicleModel: string | null; vehicleYear: number | null; chassisNo: string | null; color: string | null; mileage: number | null;
   insurerName: string | null; claimNo: string | null; insVehicleType: string | null; policyNo: string | null;
+  officerComment?: string | null;
   policyType: string | null; sumInsured: number | null; coverageStart: string | null; coverageEnd: string | null; deductible: number | null;
   centerName: string | null; centerAddress: string | null; centerContact: string | null;
   vehicleSize: string;
@@ -705,6 +706,19 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
         {/* Items */}
         <ItemSection title={`${photos.length > 0 ? 5 : 4}. ${lang === "th" ? "ค่าแรง" : "Labor"}`} items={labor} lang={lang} />
         <ItemSection title={`${photos.length > 0 ? 6 : 5}. ${lang === "th" ? "ค่าอะไหล่" : "Parts"}`} items={parts} lang={lang} />
+
+        {/* Officer's comment — only rendered when written, so reports without one
+            print exactly as they did before. */}
+        {(q as any).officerComment?.trim() && (
+          <div className="pt-6 border-t-2 border-slate-300 space-y-2 break-inside-avoid">
+            <h3 className="font-bold text-[var(--navy-900)] text-sm flex items-center gap-2">
+              <span>💬 {lang === "th" ? "ความเห็นเจ้าหน้าที่คุมราคา" : "Officer's Comment"}</span>
+            </h3>
+            <div className="text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-300 rounded-xl p-3.5 bg-slate-50 print:bg-white">
+              {(q as any).officerComment}
+            </div>
+          </div>
+        )}
 
         {/* PDF & Screen Summary Table (End Summary - Centered Layout) */}
         {(() => {
