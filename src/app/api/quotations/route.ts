@@ -46,10 +46,36 @@ export async function GET() {
         updatedAt: true,
         _count: { select: { items: true } },
         branch: { select: { name: true } },
+        // Read the line items to derive the labour/parts saving split below. They
+        // are aggregated away before responding — /reports only needs the two
+        // totals, and shipping every row would bloat a list that has to stay light
+        // as case volume grows.
+        items: {
+          select: {
+            type: true,
+            quotedUnit: true,
+            quotedQty: true,
+            controlledUnit: true,
+            controlledQty: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json({ quotations: rows });
+    const quotations = rows.map(({ items, ...q }) => {
+      let partsSaving = 0;
+      let laborSaving = 0;
+      for (const it of items) {
+        const diff =
+          it.quotedUnit * (it.quotedQty || 1) - it.controlledUnit * (it.controlledQty || 1);
+        if (diff <= 0) continue;
+        if (it.type === "part") partsSaving += diff;
+        else laborSaving += diff;
+      }
+      return { ...q, partsSaving, laborSaving };
+    });
+
+    return NextResponse.json({ quotations });
   } catch (err) {
     console.error("GET quotations error:", err);
     return NextResponse.json({ quotations: [], error: String(err) }, { status: 500 });

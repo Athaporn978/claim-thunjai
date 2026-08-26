@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -34,13 +34,13 @@
   --color-orange: var(--orange-500);
   --color-orange-600: var(--orange-600);
   --color-orange-50: var(--orange-50);
-  --font-sans: 'Sarabun', 'TH Sarabun New', 'TH Sarabun PSK', 'Inter', sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Sarabun', 'TH Sarabun New', 'TH Sarabun PSK', 'Inter', sans-serif;
 }
 
 html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Sarabun', 'TH Sarabun New', 'TH Sarabun PSK', 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Sarabun', 'TH Sarabun New', 'TH Sarabun PSK', 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

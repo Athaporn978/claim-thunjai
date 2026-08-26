@@ -261,7 +261,7 @@ export function Sidebar() {
     <aside
       className={`bg-[#0b132a] text-white flex flex-col h-screen max-h-screen border-r border-[#152243] font-sans transition-all duration-300 ease-in-out overflow-hidden no-print
         fixed inset-y-0 left-0 z-50 w-64 ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:sticky lg:top-0 lg:z-30 lg:shrink-0 lg:translate-x-0 ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}
+        ${isCollapsed ? "lg:hidden" : "lg:sticky lg:top-0 lg:z-30 lg:shrink-0 lg:translate-x-0"}`}
     >
       {/* Brand Header & Toggle */}
       <div className="p-4 border-b border-[#152243] flex items-center justify-between gap-2">
@@ -281,14 +281,10 @@ export function Sidebar() {
         <button
           onClick={toggleSidebar}
           className="hidden lg:block p-1.5 rounded-xl bg-[#111c38] text-slate-300 hover:text-white hover:bg-[#1b2b52] border border-[#1b2b52] transition cursor-pointer shrink-0"
-          title={isCollapsed ? (lang === "th" ? "ขยายแถบเมนู" : "Expand Sidebar") : (lang === "th" ? "ย่อแถบเมนู" : "Collapse Sidebar")}
+          title={lang === "th" ? "ซ่อนแถบเมนู (เต็มจอ)" : "Hide sidebar (full screen)"}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            {isCollapsed ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            )}
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 

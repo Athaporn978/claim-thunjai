@@ -1,5 +1,19 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useLang } from "@/lib/LangContext";
 
 type Quotation = {
@@ -16,7 +30,8 @@ type Quotation = {
   totalSaving: number;
   createdAt: string;
   branchName?: string;
-  items?: { type: string; name: string; quotedUnit: number; controlledUnit: number }[];
+  partsSaving?: number;
+  laborSaving?: number;
 };
 
 const MOCK_BRANCHES = [
@@ -93,22 +108,15 @@ export default function ReportsPageLuxury() {
 
   // Chart Group States
   const [chartGroupMode, setChartGroupMode] = useState<"daily" | "monthly">("daily");
-  const [hoveredPoint, setHoveredPoint] = useState<{
-    x: number;
-    y: number;
-    val: number;
-    label: string;
-    isPrev: boolean;
-  } | null>(null);
 
-  // Other components hover states
-  const [hoveredSparkline, setHoveredSparkline] = useState<{ x: number; y: number; val: number } | null>(null);
+  // Hover states for the remaining hand-built visuals (radial gauge, progress rows).
+  // The line/donut/bar charts no longer need these — Recharts owns their tooltips.
   const [hoveredRadial, setHoveredRadial] = useState<boolean>(false);
-  const [hoveredDonut, setHoveredDonut] = useState<"parts" | "labor" | null>(null);
   const [hoveredProgressItem, setHoveredProgressItem] = useState<number | null>(null);
-  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
-  // Date Filter States
+  const [tablePage, setTablePage] = useState(1);
+
+  // Date range filter
   const [datePreset, setDatePreset] = useState("all"); // 'all' | 'today' | '7days' | '30days' | 'month' | 'year' | 'custom'
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -257,12 +265,11 @@ export default function ReportsPageLuxury() {
     let laborSaving = 0;
 
     filtered.forEach((q) => {
-      if (q.items && q.items.length > 0) {
-        q.items.forEach((item: any) => {
-          const diff = ((item.quotedUnit * (item.quotedQty || 1)) - (item.controlledUnit * (item.controlledQty || 1))) || 0;
-          if (item.type === "part") partsSaving += Math.max(0, diff);
-          else laborSaving += Math.max(0, diff);
-        });
+      // Real split computed server-side from the line items. The old 70/30
+      // estimate below only survives for rows that predate it or have no items.
+      if (q.partsSaving != null || q.laborSaving != null) {
+        partsSaving += q.partsSaving || 0;
+        laborSaving += q.laborSaving || 0;
       } else {
         const s = q.totalSaving || 0;
         partsSaving += s * 0.70;
@@ -393,73 +400,20 @@ export default function ReportsPageLuxury() {
     };
   }, [filtered, chartGroupMode, datePreset, lang]);
 
+  // Recharts consumes the same buckets groupedChartData already produces; the old
+  // hand-built bezier path memo below is what it replaces.
+  const rechartsSeries = useMemo(
+    () =>
+      (groupedChartData.labels || []).map((label: string, i: number) => ({
+        label,
+        count: groupedChartData.currentCount[i] ?? 0,
+      })),
+    [groupedChartData]
+  );
+
   // Smooth Bezier path builders
-  const splineChartPaths = useMemo(() => {
-    const width = 600;
-    const height = 180;
-
-    const labels = groupedChartData.labels;
-    const currentCount = groupedChartData.currentCount;
-
-    if (labels.length === 0) return null;
-
-    const maxVal = Math.max(...currentCount, 5);
-
-    const makePaths = (values: number[]) => {
-      if (values.length === 0) return null;
-      const points = values.map((val, idx) => {
-        const x = (idx / (values.length - 1 || 1)) * width;
-        const y = height - 15 - (val / maxVal) * (height - 30);
-        return { x, y };
-      });
-
-      let linePath = `M ${points[0].x} ${points[0].y}`;
-      for (let i = 1; i < points.length; i++) {
-        linePath += ` L ${points[i].x} ${points[i].y}`;
-      }
-
-      return { linePath, points };
-    };
-
-    return {
-      currentCount: makePaths(currentCount),
-      width,
-      height,
-      labels,
-      maxVal,
-    };
-  }, [groupedChartData]);
 
   // Sparkline wave paths for top header trend card (Widget 4)
-  const sparklinePaths = useMemo(() => {
-    const width = 180;
-    const height = 55;
-    const vals = filtered.slice(0, 8).map((q) => q.totalSaving).reverse();
-    if (vals.length < 2) return null;
-
-    const maxVal = Math.max(...vals, 1);
-    const minVal = Math.min(...vals, 0);
-    const range = maxVal - minVal || 1;
-
-    const points = vals.map((val, idx) => {
-      const x = (idx / (vals.length - 1)) * width;
-      const y = height - 5 - ((val - minVal) / range) * (height - 10);
-      return { x, y };
-    });
-
-    let linePath = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-      const cpX1 = p0.x + (p1.x - p0.x) / 2;
-      const cpY1 = p0.y;
-      const cpX2 = p0.x + (p1.x - p0.x) / 2;
-      const cpY2 = p1.y;
-      linePath += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
-    }
-    const areaPath = `${linePath} L ${width} ${height} L 0 ${height} Z`;
-    return { linePath, areaPath, width, height, points };
-  }, [filtered]);
 
   // Donut SVG params for Parts vs Labor
   const donutStrokeParams = useMemo(() => {
@@ -570,7 +524,7 @@ export default function ReportsPageLuxury() {
   return (
     <div className="p-6 md:p-8 text-[#1d1d1f] space-y-6 max-w-[1600px] mx-auto animate-fade-in font-sans">
       {/* Unified Search, Filters & Date Preset Header Panel */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
         {/* Row 1: Title, Search, Branch, Refresh & Export */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -580,9 +534,10 @@ export default function ReportsPageLuxury() {
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Quick Search */}
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            {/* Quick Search — fixed width on purpose: it used to grow on focus,
+                which pushed this whole control group onto a new line mid-typing. */}
+            <div className="relative w-full sm:w-auto">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -593,7 +548,7 @@ export default function ReportsPageLuxury() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={lang === "th" ? "ค้นหาด้วยชื่อ, ทะเบียนรถ, หรือเลขที่ใบเสนอราคา..." : "Search..."}
-                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-72 sm:w-80 md:w-96 transition-all focus:w-[420px] text-slate-800"
+                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-full sm:w-80 md:w-96 text-slate-800"
               />
             </div>
 
@@ -751,7 +706,7 @@ export default function ReportsPageLuxury() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* Card 1: Processed Volume */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-56 relative overflow-hidden text-center">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-56 relative overflow-hidden text-center">
           <div className="space-y-1">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Processed Volume</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ปริมาณรายการที่ดำเนินการ</h3>
@@ -769,7 +724,7 @@ export default function ReportsPageLuxury() {
         </div>
 
         {/* Card 2: Total Saving (NEW!) */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-56 relative overflow-hidden text-center ring-2 ring-orange-400/40">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-56 relative overflow-hidden text-center ring-2 ring-orange-400/40">
           <div className="space-y-1">
             <span className="text-xs font-bold text-orange-500 uppercase tracking-widest block">Total Optimization</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ยอด Saving รวมสุทธิ</h3>
@@ -787,7 +742,7 @@ export default function ReportsPageLuxury() {
         </div>
 
         {/* Card 3: Average Savings */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-56 relative overflow-hidden text-center">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-56 relative overflow-hidden text-center">
           <div className="space-y-1">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Average Optimization</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ยอด Saving เฉลี่ย/รายการ</h3>
@@ -805,7 +760,7 @@ export default function ReportsPageLuxury() {
         </div>
 
         {/* Card 6: Circular Progress Widget (Saving Rate / Radial Ring) - Prominent at the top */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-56 relative overflow-hidden text-center">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-56 relative overflow-hidden text-center">
           <div className="space-y-1">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Saving Rate</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">อัตราส่วนลดคุมราคาเฉลี่ย</h3>
@@ -859,7 +814,7 @@ export default function ReportsPageLuxury() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Card 5: Large single-line area chart (Claim Volume Current Period) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between min-h-[300px]">
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[300px]">
           <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-3.5 mb-4 gap-4">
             <div>
               <h2 className="text-base font-extrabold text-[var(--navy-900)] flex items-center gap-2">
@@ -878,129 +833,36 @@ export default function ReportsPageLuxury() {
             </div>
           </div>
 
-          <div className="flex-1 w-full h-44 py-1 relative flex flex-col justify-end">
-            {splineChartPaths ? (
-              <>
-                <svg width="100%" height="100%" viewBox={`0 0 ${splineChartPaths.width} ${splineChartPaths.height}`} preserveAspectRatio="none">
-                  {/* Grid Lines & Y Axis Labels */}
-                  {[0, 0.25, 0.5, 0.75, 1.0].map((ratio, idx) => {
-                    const y = splineChartPaths.height - 15 - ratio * (splineChartPaths.height - 30);
-                    const val = Math.round(splineChartPaths.maxVal * ratio);
-                    return (
-                      <g key={idx}>
-                        <line
-                          x1="0"
-                          y1={y}
-                          x2={splineChartPaths.width}
-                          y2={y}
-                          stroke="#f1f5f9"
-                          strokeWidth="1"
-                          strokeDasharray={ratio === 0 ? "none" : "4 4"}
-                        />
-                        <text
-                          x="5"
-                          y={y - 4}
-                          fill="#94a3b8"
-                          fontSize="8"
-                          fontWeight="black"
-                        >
-                          {val}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  
-                  {/* Lines */}
-                  {splineChartPaths.currentCount && (
-                    <path d={splineChartPaths.currentCount.linePath} fill="none" stroke="#0071e3" strokeWidth="3" />
-                  )}
-                  
-                  {/* Dots for Current Count Line */}
-                  {splineChartPaths.currentCount && splineChartPaths.currentCount.points.map((p, idx) => (
-                    <circle
-                      key={idx}
-                      cx={p.x}
-                      cy={p.y}
-                      r="4.5"
-                      fill="#0071e3"
-                      stroke="#ffffff"
-                      strokeWidth="1.5"
-                      className="cursor-pointer transition-all hover:scale-125"
-                      style={{ transformOrigin: `${p.x}px ${p.y}px` }}
-                      onMouseEnter={() => setHoveredPoint({
-                        x: p.x,
-                        y: p.y,
-                        val: groupedChartData.currentCount[idx] || 0,
-                        label: splineChartPaths.labels[idx],
-                        isPrev: false
-                      })}
-                      onMouseLeave={() => setHoveredPoint(null)}
-                    />
-                  ))}
-                </svg>
-
-                {/* Tooltip Overlay */}
-                {hoveredPoint && (
-                  (() => {
-                    const percentX = (hoveredPoint.x / splineChartPaths.width) * 100;
-                    let translateX = "-50%";
-                    let arrowLeft = "50%";
-                    
-                    if (percentX > 85) {
-                      translateX = "-85%";
-                      arrowLeft = "85%";
-                    } else if (percentX < 15) {
-                      translateX = "-15%";
-                      arrowLeft = "15%";
-                    }
-
-                    return (
-                      <div
-                        className="absolute z-30 pointer-events-none bg-[#0b132a] text-white px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-md text-[10px] font-bold transition-all flex flex-col items-center gap-0.5"
-                        style={{
-                          left: `${percentX}%`,
-                          top: `${(hoveredPoint.y / splineChartPaths.height) * 100}%`,
-                          transform: `translate(${translateX}, -48px)`,
-                        }}
-                      >
-                        <div className="text-slate-400 font-extrabold">{chartGroupMode === "daily" ? `วันที่ ${hoveredPoint.label}` : hoveredPoint.label}</div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                          <span>จำนวน:</span>
-                          <span className="text-white font-black">{hoveredPoint.val} รายการ</span>
-                        </div>
-                        {/* Small arrow pointing to the dot */}
-                        <div
-                          className="absolute bottom-0 w-2 h-2 bg-[#0b132a] rotate-45 border-r border-b border-slate-800 translate-y-1/2"
-                          style={{
-                            left: arrowLeft,
-                            transform: "translateX(-50%) rotate(45deg)",
-                          }}
-                        ></div>
-                      </div>
-                    );
-                  })()
-                )}
-
-                {/* X Axis Labels */}
-                <div className="flex justify-between text-[9px] font-black text-slate-400 mt-2 px-1">
-                  {splineChartPaths.labels.map((label, idx) => {
-                    const total = splineChartPaths.labels.length;
-                    if (total > 12 && idx % 5 !== 0 && idx !== total - 1) {
-                      return <span key={idx} className="w-8 text-center text-transparent">—</span>;
-                    }
-                    return <span key={idx} className="w-8 text-center text-slate-400">{label}</span>;
-                  })}
-                </div>
-              </>
+          <div className="flex-1 w-full h-52 py-1">
+            {rechartsSeries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={rechartsSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="rptArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0071e3" stopOpacity={0.30} />
+                      <stop offset="100%" stopColor="#0071e3" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} interval="preserveStartEnd" />
+                  <YAxis tickLine={false} axisLine={false} width={34} allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 8px 24px rgba(0,0,0,.08)" }}
+                    formatter={(v) => [`${Number(v) || 0} ${lang === "th" ? "รายการ" : "reports"}`, ""]}
+                  />
+                  <Area type="monotone" dataKey="count" stroke="#0071e3" strokeWidth={2.5} fill="url(#rptArea)" isAnimationActive={false} />
+                </AreaChart>
+              </ResponsiveContainer>
             ) : (
-              <div className="text-xs text-slate-400 font-bold m-auto text-center">ไม่มีข้อมูลเพียงพอสำหรับการพล็อตกราฟตามเงื่อนไขที่เลือก</div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-400 font-bold text-center">
+                ไม่มีข้อมูลเพียงพอสำหรับการพล็อตกราฟตามเงื่อนไขที่เลือก
+              </div>
             )}
           </div>
         </div>
 
         {/* Card 3: Workflow Progress (Redesigned to min-h-[300px] to align with Card 5) */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between min-h-[300px]">
+        <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[300px]">
           <div className="border-b border-slate-100 pb-3.5 mb-2">
             <h2 className="text-base font-extrabold text-[var(--navy-900)] flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
@@ -1068,7 +930,7 @@ export default function ReportsPageLuxury() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
         {/* Card 7: Horizontal progress segmented list (Delenit augue reference) */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-64">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-64">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">สัดส่วนการเคลมแยกคลาสงาน</h3>
             <p className="text-[10px] text-slate-500 font-medium">โครงสร้างค่าใช้จ่ายจำแนกตามประเภทอะไหล่และค่าบริการ</p>
@@ -1126,64 +988,43 @@ export default function ReportsPageLuxury() {
         </div>
 
         {/* Card 8: Donut Chart (Consectetuer 70/30) */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-64">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-64">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">สัดส่วนมูลค่า Saving สะสม</h3>
             <p className="text-[10px] text-slate-500 font-medium">ความต่างของเงินที่ Saving ได้ระหว่าง อะไหล่ และ ค่าแรง</p>
           </div>
           <div className="flex-1 flex items-center justify-around py-3">
-            <div className="relative w-28 h-28 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                {/* Parts saving segment */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={donutStrokeParams.radius}
-                  stroke="#0071e3"
-                  strokeWidth="12"
-                  fill="transparent"
-                  strokeDasharray={donutStrokeParams.circ}
-                  strokeDashoffset={donutStrokeParams.partsOffset}
-                  strokeLinecap="round"
-                  className="cursor-pointer transition-all hover:stroke-[14px]"
-                  onMouseEnter={() => setHoveredDonut("parts")}
-                  onMouseLeave={() => setHoveredDonut(null)}
-                />
-                {/* Labor saving segment */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={donutStrokeParams.radius}
-                  stroke="#10b981"
-                  strokeWidth="12"
-                  fill="transparent"
-                  strokeDasharray={`${(donutStrokeParams.laborVal / 100) * donutStrokeParams.circ} ${(donutStrokeParams.partsVal / 100) * donutStrokeParams.circ}`}
-                  strokeDashoffset={-((donutStrokeParams.partsVal / 100) * donutStrokeParams.circ)}
-                  strokeLinecap="round"
-                  className="cursor-pointer transition-all hover:stroke-[14px]"
-                  onMouseEnter={() => setHoveredDonut("labor")}
-                  onMouseLeave={() => setHoveredDonut(null)}
-                />
-              </svg>
-              {/* Central text for Donut hover values */}
-              <div className="absolute text-center flex flex-col items-center justify-center pointer-events-none">
-                {hoveredDonut ? (
-                  <>
-                    <span className="text-[8px] text-slate-400 font-extrabold uppercase">
-                      {hoveredDonut === "parts" ? "อะไหล่" : "ค่าแรง"}
-                    </span>
-                    <span className={`text-[10px] font-black ${hoveredDonut === "parts" ? "text-[#0071e3]" : "text-[#10b981]"}`}>
-                      ฿{hoveredDonut === "parts" ? partsVsLabor.partsSaving.toLocaleString() : partsVsLabor.laborSaving.toLocaleString()}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[8px] text-slate-400 font-extrabold uppercase">Saving</span>
-                    <span className="text-[10px] font-black text-slate-800">
-                      Breakdown
-                    </span>
-                  </>
-                )}
+            <div className="relative w-28 h-28">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "อะไหล่", value: partsVsLabor.partsSaving },
+                      { name: "ค่าแรง", value: partsVsLabor.laborSaving },
+                    ]}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="72%"
+                    outerRadius="100%"
+                    paddingAngle={2}
+                    stroke="none"
+                    isAnimationActive={false}
+                  >
+                    <Cell fill="#0071e3" />
+                    <Cell fill="#10b981" />
+                  </Pie>
+                  <Tooltip
+                    // The centre "SAVING / Breakdown" label sits over the ring, so the
+                    // tooltip has to paint above it or the two overlap unreadably.
+                    wrapperStyle={{ zIndex: 20 }}
+                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 8px 24px rgba(0,0,0,.08)" }}
+                    formatter={(v) => `฿${(Number(v) || 0).toLocaleString()}`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 z-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[8px] text-slate-400 font-extrabold uppercase">Saving</span>
+                <span className="text-[10px] font-black text-slate-800">Breakdown</span>
               </div>
             </div>
             
@@ -1201,7 +1042,7 @@ export default function ReportsPageLuxury() {
         </div>
 
         {/* Card 9: Column / Bar Chart (Real Monthly Saving Data + Interactive Tooltip) */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between h-64 relative">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between h-64 relative">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ยอด Saving รวมรายเดือน</h3>
@@ -1212,55 +1053,141 @@ export default function ReportsPageLuxury() {
             </span>
           </div>
 
-          <div className="flex-1 flex items-end justify-between px-2 py-4 h-36 relative">
-            {barChartCols.map((c, idx) => {
-              const isHovered = hoveredBarIndex === idx;
-              return (
-                <div
-                  key={idx}
-                  className="flex flex-col items-center gap-1.5 flex-1 relative group cursor-pointer"
-                  onMouseEnter={() => setHoveredBarIndex(idx)}
-                  onMouseLeave={() => setHoveredBarIndex(null)}
-                >
-                  {/* Floating Rich Tooltip on Hover */}
-                  {isHovered && (
-                    <div className="absolute bottom-full mb-3.5 z-50 pointer-events-none whitespace-nowrap bg-[#0b132a] text-white p-2.5 rounded-2xl shadow-xl border border-slate-700 text-center transition-all animate-fadeIn">
-                      <div className="text-[10px] font-bold text-slate-400">{c.fullMonth}</div>
-                      <div className="text-xs font-extrabold text-emerald-400 mt-0.5">
-                        ฿{c.saving.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                      <div className="text-[9px] text-slate-300 font-medium mt-0.5">
-                        {c.count} รายการ
-                      </div>
-                      {/* Triangle Pointer */}
-                      <div className="w-2.5 h-2.5 bg-[#0b132a] border-r border-b border-slate-700 transform rotate-45 mx-auto -mb-3 mt-1" />
-                    </div>
-                  )}
-
-                  {/* Bar Element */}
-                  <div
-                    className={`w-5 rounded-t-xl transition-all duration-300 ${
-                      c.saving > 0
-                        ? isHovered
-                          ? "bg-gradient-to-t from-[#0071e3] to-sky-300 scale-110 shadow-md ring-2 ring-blue-300"
-                          : "bg-gradient-to-t from-[#0071e3] to-blue-400"
-                        : isHovered
-                        ? "bg-slate-300 scale-105"
-                        : "bg-slate-200"
-                    }`}
-                    style={{ height: `${c.heightPct}%`, minHeight: "12px" }}
-                  ></div>
-
-                  {/* Month Label */}
-                  <span className={`text-[9px] font-extrabold tracking-wider transition-colors ${isHovered ? "text-[#0071e3]" : "text-slate-400"}`}>
-                    {c.month}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="flex-1 h-36 py-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barChartCols} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                <Tooltip
+                  cursor={{ fill: "rgba(0,113,227,.06)" }}
+                  contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 8px 24px rgba(0,0,0,.08)" }}
+                  labelFormatter={(_l, pl) => (pl && pl[0] ? (pl[0].payload as { fullMonth: string }).fullMonth : "")}
+                  formatter={(v) => [`฿${(Number(v) || 0).toLocaleString()}`, lang === "th" ? "ยอด Saving" : "Saving"]}
+                />
+                {/* borderRadius 4 in the reference mockup */}
+                <Bar dataKey="saving" fill="#0071e3" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
+      </div>
+
+      {/* Gradient KPI cards — the reference mockup's colour block, in system colours */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {[
+          { title: lang === "th" ? "ยอดประหยัดรวม" : "Total Saving", value: "฿" + metrics.totalSaving.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), grad: "from-[#0071e3] to-[#005bb5]" },
+          { title: lang === "th" ? "อัตราประหยัดเฉลี่ย" : "Saving Rate", value: metrics.savingPercent.toFixed(1) + "%", grad: "from-blue-700 to-indigo-800" },
+          { title: lang === "th" ? "ค่าอะไหล่ที่ประหยัดได้" : "Parts Saving", value: "฿" + partsVsLabor.partsSaving.toLocaleString(), grad: "from-[#ff7a1a] to-[#e8650a]" },
+          { title: lang === "th" ? "ค่าแรงที่ประหยัดได้" : "Labour Saving", value: "฿" + partsVsLabor.laborSaving.toLocaleString(), grad: "from-emerald-500 to-teal-600" },
+        ].map((c) => (
+          <div
+            key={c.title}
+            className={`relative overflow-hidden rounded-2xl p-4 text-white bg-gradient-to-br ${c.grad} shadow-[0_8px_20px_rgba(0,0,0,0.08)] min-h-[104px] flex flex-col justify-center gap-1`}
+          >
+            <div className="text-xs font-bold opacity-90">{c.title}</div>
+            <div className="text-2xl font-black font-mono tracking-tight truncate">{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent activity + latest cases, mirroring the reference's 1fr : 2fr bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+          <h3 className="text-sm font-extrabold text-[var(--navy-900)] mb-4">
+            {lang === "th" ? "ความเคลื่อนไหวล่าสุด" : "Recent Activity"}
+          </h3>
+          {filtered.length === 0 ? (
+            <p className="text-xs text-slate-400 font-semibold py-6 text-center">
+              {lang === "th" ? "ไม่มีข้อมูลตามตัวกรอง" : "No data for this filter"}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {filtered.slice(0, 5).map((q, i, arr) => (
+                <div key={q.id} className="flex gap-3">
+                  <div className="flex flex-col items-center shrink-0">
+                    <span className="w-9 h-9 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm shadow-sm">🚗</span>
+                    {i < arr.length - 1 && <span className="flex-1 w-px bg-slate-200 mt-1" />}
+                  </div>
+                  <div className="min-w-0 pb-1">
+                    <a href={`/quotations/${q.id}`} className="text-sm font-extrabold text-[#0071e3] hover:underline font-mono">
+                      {q.quotationNo}
+                    </a>
+                    <div className="text-xs text-slate-600 font-semibold truncate">
+                      {q.customerName || "—"} · {q.licensePlate || "—"}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      {new Date(q.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" })}
+                      {q.branchName ? ` · ${q.branchName}` : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-sm font-extrabold text-[var(--navy-900)]">
+              {lang === "th" ? "รายการเคสล่าสุด" : "Latest Cases"}
+            </h3>
+            <a href="/quotations" className="text-xs font-bold text-[#0071e3] hover:underline">
+              {lang === "th" ? "ดูทั้งหมด →" : "View all →"}
+            </a>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[520px]">
+              <thead>
+                <tr className="text-white">
+                  <th className="bg-[#0b132a] px-3 py-2.5 font-extrabold text-left rounded-l-xl whitespace-nowrap">{lang === "th" ? "เลขที่" : "No."}</th>
+                  <th className="bg-[#0b132a] px-3 py-2.5 font-extrabold text-left whitespace-nowrap">{lang === "th" ? "ลูกค้า / ทะเบียน" : "Customer / Plate"}</th>
+                  <th className="bg-[#0b132a] px-3 py-2.5 font-extrabold text-right whitespace-nowrap">{lang === "th" ? "ราคาเสนอ" : "Quoted"}</th>
+                  <th className="bg-[#0b132a] px-3 py-2.5 font-extrabold text-right rounded-r-xl whitespace-nowrap">Saving</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.slice((tablePage - 1) * 6, tablePage * 6).map((q) => (
+                  <tr key={q.id} className="border-b border-slate-100 hover:bg-slate-50/70 transition">
+                    <td className="px-3 py-3">
+                      <a href={`/quotations/${q.id}`} className="font-mono font-extrabold text-[#0071e3] hover:underline">{q.quotationNo}</a>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="font-bold text-slate-800 truncate max-w-[170px]">{q.customerName || "—"}</div>
+                      <div className="text-[11px] text-slate-500 font-medium">{q.licensePlate || "—"}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-700 whitespace-nowrap">฿{(q.totalQuoted || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right font-mono font-extrabold text-orange-600 whitespace-nowrap">฿{(q.totalSaving || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={4} className="text-center text-slate-400 py-8 font-semibold">{lang === "th" ? "ไม่พบข้อมูล" : "No data"}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 mt-auto border-t border-slate-100">
+            <span className="text-[11px] text-slate-500 font-semibold">
+              {lang === "th"
+                ? `แสดง ${filtered.length === 0 ? 0 : (tablePage - 1) * 6 + 1}–${Math.min(tablePage * 6, filtered.length)} จาก ${filtered.length}`
+                : `Showing ${filtered.length === 0 ? 0 : (tablePage - 1) * 6 + 1}–${Math.min(tablePage * 6, filtered.length)} of ${filtered.length}`}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                disabled={tablePage === 1}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 hover:border-[#0071e3] hover:text-[#0071e3] transition cursor-pointer disabled:cursor-not-allowed"
+              >←</button>
+              <span className="text-xs font-extrabold text-slate-600 px-1">
+                {tablePage} / {Math.max(1, Math.ceil(filtered.length / 6))}
+              </span>
+              <button
+                onClick={() => setTablePage((p) => Math.min(Math.max(1, Math.ceil(filtered.length / 6)), p + 1))}
+                disabled={tablePage >= Math.ceil(filtered.length / 6)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 hover:border-[#0071e3] hover:text-[#0071e3] transition cursor-pointer disabled:cursor-not-allowed"
+              >→</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

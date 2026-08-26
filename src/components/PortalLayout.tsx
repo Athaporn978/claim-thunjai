@@ -8,7 +8,7 @@ import { useLang } from "@/lib/LangContext";
 
 // Separate component so it can read the sidebar context that PortalLayout provides.
 function PortalShell({ children }: { children: React.ReactNode }) {
-  const { isMobileOpen, openMobile, closeMobile } = useSidebar();
+  const { isMobileOpen, openMobile, closeMobile, isCollapsed, toggleSidebar } = useSidebar();
   const { lang } = useLang();
 
   return (
@@ -25,12 +25,26 @@ function PortalShell({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="flex-1 min-w-0 h-screen overflow-y-auto overflow-x-hidden bg-[#f0f4fd] print:h-auto print:max-h-none print:bg-white print:overflow-visible">
-        {/* Mobile top bar — the only way to reach the nav below lg */}
-        <div className="lg:hidden sticky top-0 z-20 flex items-center gap-3 bg-[#0b132a] text-white px-4 py-2.5 border-b border-[#152243] no-print">
+        {/* Top bar — always below lg (the only way to reach the nav there), and on
+            desktop only while the sidebar is hidden, so there is always a way back. */}
+        <div
+          className={`${isCollapsed ? "" : "lg:hidden"} sticky top-0 z-20 flex items-center gap-3 bg-[#0b132a] text-white px-4 py-2.5 border-b border-[#152243] no-print`}
+        >
+          {/* Below lg the button opens the drawer; on desktop it restores the sidebar. */}
           <button
             onClick={openMobile}
             aria-label={lang === "th" ? "เปิดเมนู" : "Open menu"}
-            className="p-2 -ml-1 rounded-xl text-slate-200 hover:text-white hover:bg-[#1b2b52] transition cursor-pointer"
+            className="lg:hidden p-2 -ml-1 rounded-xl text-slate-200 hover:text-white hover:bg-[#1b2b52] transition cursor-pointer"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <button
+            onClick={toggleSidebar}
+            aria-label={lang === "th" ? "แสดงแถบเมนู" : "Show sidebar"}
+            title={lang === "th" ? "แสดงแถบเมนู" : "Show sidebar"}
+            className="hidden lg:block p-2 -ml-1 rounded-xl text-slate-200 hover:text-white hover:bg-[#1b2b52] transition cursor-pointer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
