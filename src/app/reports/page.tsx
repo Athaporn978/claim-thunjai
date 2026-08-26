@@ -570,35 +570,6 @@ export default function ReportsPageLuxury() {
               />
             </div>
 
-            {searchQuery.trim() && (
-              <div className="flex flex-wrap items-center gap-1.5 max-w-full">
-                {matchedPlates.length === 0 ? (
-                  <span className="text-[11px] font-bold text-slate-400">
-                    {lang === "th" ? "ไม่พบทะเบียนที่ตรงกัน" : "No matching plate"}
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-[11px] font-bold text-slate-400">
-                      {lang === "th" ? "ตรงกับ:" : "Matched:"}
-                    </span>
-                    {matchedPlates.slice(0, 4).map((p) => (
-                      <span
-                        key={p}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0071e3] bg-[#eef6ff] border border-[#cce5ff] rounded-lg px-2 py-0.5 whitespace-nowrap"
-                      >
-                        🚗 {p}
-                      </span>
-                    ))}
-                    {matchedPlates.length > 4 && (
-                      <span className="text-[11px] font-bold text-slate-400">
-                        +{matchedPlates.length - 4}
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
             {/* Branch Multi-Select Dropdown (with RBAC Scoping) */}
             <div className="relative">
               <button
@@ -700,6 +671,41 @@ export default function ReportsPageLuxury() {
               <span>{lang === "th" ? "ส่งออกรายงาน" : "Export Report"}</span>
             </button>
           </div>
+        </div>
+
+        {/* Matched plates — its own row with a reserved height. Sitting inside the
+            control row above made that row wrap the moment it appeared, bouncing the
+            title and search box onto a second line mid-typing. Kept to a single line
+            (scrolling sideways instead of wrapping) so its height never changes and
+            nothing below it moves either — on a phone, wrapping shifted the date bar
+            down by 27px. */}
+        <div className="h-[34px] shrink-0 flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+          {searchQuery.trim() && (
+            matchedPlates.length === 0 ? (
+              <span className="text-[11px] font-bold text-slate-400">
+                {lang === "th" ? "ไม่พบทะเบียนที่ตรงกัน" : "No matching plate"}
+              </span>
+            ) : (
+              <>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {lang === "th" ? "ตรงกับ:" : "Matched:"}
+                </span>
+                {matchedPlates.slice(0, 6).map((p) => (
+                  <span
+                    key={p}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0071e3] bg-[#eef6ff] border border-[#cce5ff] rounded-lg px-2 py-0.5 whitespace-nowrap"
+                  >
+                    🚗 {p}
+                  </span>
+                ))}
+                {matchedPlates.length > 6 && (
+                  <span className="text-[11px] font-bold text-slate-400">
+                    +{matchedPlates.length - 6}
+                  </span>
+                )}
+              </>
+            )
+          )}
         </div>
 
         {/* Row 2: Integrated Date Preset Bar */}
