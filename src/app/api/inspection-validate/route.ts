@@ -1,11 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { recordUsage } from "@/lib/aiUsage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-5";
+
+/**
+ * One inspection makes several independent Claude calls; metering each under its
+ * own step name shows which of them actually drives the cost. Recording is
+ * fire-and-forget — recordUsage never throws — so this stays transparent to the
+ * existing error handling, which rethrows into each caller's catch.
+ */
+async function createMetered(
+  step: string,
+  params: Anthropic.MessageCreateParamsNonStreaming
+): Promise<Anthropic.Message> {
+  const route = `/api/inspection-validate:${step}`;
+  const startedAt = Date.now();
+  try {
+    const msg = await client.messages.create(params);
+    await recordUsage({
+      route,
+      model: MODEL,
+      usage: msg.usage,
+      stopReason: msg.stop_reason,
+      durationMs: Date.now() - startedAt,
+    });
+    return msg;
+  } catch (err) {
+    await recordUsage({
+      route,
+      model: MODEL,
+      success: false,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      durationMs: Date.now() - startedAt,
+    });
+    throw err;
+  }
+}
 
 type Img = { data: string; mediaType: string };
 type Body = {
@@ -60,7 +95,7 @@ Return ONLY valid JSON with this shape:
   });
 
   try {
-    const msg = await client.messages.create({
+    const msg = await createMetered("angles", {
       model: MODEL,
       max_tokens: 1500,
       messages: [{ role: "user", content }],
@@ -131,7 +166,7 @@ For VIN, use characters only (no spaces). For plate, keep it as-is including Tha
   });
 
   try {
-    const msg = await client.messages.create({
+    const msg = await createMetered("identity", {
       model: MODEL,
       max_tokens: 800,
       messages: [{ role: "user", content }],
@@ -244,7 +279,7 @@ Return ONLY valid JSON shape:
   });
 
   try {
-    const msg = await client.messages.create({
+    const msg = await createMetered("damage", {
       model: MODEL,
       max_tokens: 1500,
       messages: [{ role: "user", content }],

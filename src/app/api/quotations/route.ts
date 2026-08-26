@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { totals, type QuotationInput } from "@/lib/quotation";
+import { linkUsageToQuotation } from "@/lib/aiUsage";
 import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -137,6 +138,13 @@ export async function POST(req: NextRequest) {
         include: { items: true },
       });
     });
+
+    // The AI scan ran before this quotation existed, so its cost row couldn't be
+    // attributed at the time — link it now that we have an id.
+    const usageLogId = Number((body as any).usageLogId);
+    if (Number.isFinite(usageLogId) && usageLogId > 0) {
+      await linkUsageToQuotation(usageLogId, created.id);
+    }
 
     return NextResponse.json({ quotation: created });
   } catch (err) {

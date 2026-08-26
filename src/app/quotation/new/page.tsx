@@ -119,6 +119,9 @@ function Wizard() {
   const sp = useSearchParams();
   const editId = sp.get("id");
   const [form, setForm] = useState<QuotationInput>(EMPTY);
+  // Cost row for the AI scan that populated this form, linked to the quotation
+  // on first save. A ref, not state: it must never trigger a re-render.
+  const scanUsageLogId = useRef<number | null>(null);
   const [insurerCustom, setInsurerCustom] = useState(false);
   const [centerCustom, setCenterCustom] = useState(false);
   const [step, setStep] = useState(0);
@@ -144,6 +147,8 @@ function Wizard() {
     setUploadedFileSignatures([]);
     setPendingReuploadData(null);
     setDuplicateNoticeMsg(null);
+    // Clear too, or a fresh case would inherit the previous scan's cost row.
+    scanUsageLogId.current = null;
   }, []);
 
   // Reset form when opening a new quotation
@@ -261,6 +266,9 @@ function Wizard() {
         createdByEmail: userEmail,
         branchName: userBranch,
         status: (opts?.finalize || opts?.thenView) ? "completed" : (form.status || "draft"),
+        // Only meaningful on the first save (POST) of an AI-scanned case; the
+        // server ignores it otherwise.
+        usageLogId: scanUsageLogId.current,
       };
       const res = await fetch(id ? `/api/quotations/${id}` : "/api/quotations", {
         method: id ? "PUT" : "POST",
@@ -381,6 +389,9 @@ function Wizard() {
 
       const items = data.items || [];
       const meta = data.metadata || {};
+      // Carried through to the save so the scan's AI cost can be attributed to
+      // the quotation it produced (see linkUsageToQuotation).
+      scanUsageLogId.current = typeof data.usageLogId === "number" ? data.usageLogId : null;
 
       let matchedBrandName = meta.vehicleBrand || "";
       let matchedModelName = meta.vehicleModel || "";

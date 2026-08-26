@@ -1,9 +1,39 @@
 import Anthropic from "@anthropic-ai/sdk";
 import sharp from "sharp";
 import { estimateTotal } from "@/lib/priceLookup";
+import { recordUsage } from "@/lib/aiUsage";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-opus-5";
+
+/** See the equivalent helper in /api/inspection-validate — same rationale. */
+async function createMetered(
+  step: string,
+  params: Anthropic.MessageCreateParamsNonStreaming
+): Promise<Anthropic.Message> {
+  const route = `damageAnalysis:${step}`;
+  const startedAt = Date.now();
+  try {
+    const msg = await client.messages.create(params);
+    await recordUsage({
+      route,
+      model: MODEL,
+      usage: msg.usage,
+      stopReason: msg.stop_reason,
+      durationMs: Date.now() - startedAt,
+    });
+    return msg;
+  } catch (err) {
+    await recordUsage({
+      route,
+      model: MODEL,
+      success: false,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      durationMs: Date.now() - startedAt,
+    });
+    throw err;
+  }
+}
 const CONCURRENCY = 4;
 const MAX_VISION_IMAGES = 6;
 
@@ -70,7 +100,7 @@ export async function analyzeImages(
 
   async function analyzeOne(img: ImgInput): Promise<Record<string, unknown>> {
     try {
-      const msg = await client.messages.create({
+      const msg = await createMetered("vision", {
         model: MODEL,
         max_tokens: 2048,
         system: DAMAGE_PROMPT,
@@ -216,7 +246,7 @@ export async function extractIntakeFields(
       text: `Email Text:\n"""${(emailBody || "").slice(0, 4000)}"""\n\nExtract structured fields from the email text and attached documents/PDFs. Return the JSON object only.`,
     });
 
-    const msg = await client.messages.create({
+    const msg = await createMetered("email-extract", {
       model: MODEL,
       max_tokens: 1000,
       system: `You extract structured fields from a Thai car-insurance email or PDF/image quotation sent by a repair shop. Return ONLY this JSON:

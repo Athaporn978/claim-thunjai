@@ -295,3 +295,52 @@ model SystemAuditLog {
   @@index([module])
   @@index([createdAt])
 }
+
+/// One row per Claude API call — successes and failures alike, since a failed
+/// call costs the same as a successful one and knowing what retries burn is
+/// half the point of this table.
+///
+/// Deliberately holds NO prompt text, NO model output and NO customer data:
+/// only counts and metadata. That keeps the export endpoint (and any external
+/// dashboard reading it) free of claim data entirely.
+model ApiUsageLog {
+  /// Auto-increment rather than cuid so an external dashboard can pull
+  /// incrementally with a stable cursor ("give me everything after id N").
+  id      Int    @id @default(autoincrement())
+  /// Which system produced this row, so one dashboard can cover several apps.
+  appName String @default("claim-thunjai")
+  /// API route or module that made the call, e.g. "/api/extract-quote".
+  route   String
+
+  model String // e.g. "claude-opus-5" | "claude-sonnet-5"
+
+  // Token counts are the source of truth: if per-token prices change later,
+  // costUsd can be recomputed from these, but the counts never change.
+  inputTokens         Int @default(0)
+  outputTokens        Int @default(0)
+  cacheReadTokens     Int @default(0)
+  cacheCreationTokens Int @default(0)
+
+  /// Computed at write time from the price table in src/lib/aiUsage.ts.
+  costUsd Float @default(0)
+
+  success      Boolean @default(true)
+  /// Claude's stop_reason, or a short error label when the call threw.
+  stopReason   String?
+  errorMessage String?
+  durationMs   Int?
+
+  // Attribution. Nullable throughout: /api/extract-quote runs before a
+  // quotation exists, and public inspection links have no logged-in user.
+  quotationId String?
+  userEmail   String?
+  branchName  String?
+  /// Reserved for the multi-tenant/SaaS work — unused for now.
+  tenantId    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([route])
+  @@index([quotationId])
+}

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canonicalBrand, lookupLaborPrice } from "@/lib/priceLookup";
 import { normalizePart } from "@/lib/partNameMap";
+import { recordUsage } from "@/lib/aiUsage";
 import type Anthropic from "@anthropic-ai/sdk";
+
+const EXTRACT_MODEL = "claude-sonnet-5";
 
 // Guess repair-severity tier from keywords in the labor line-item name.
 function detectSeverityTier(name: string): "minor" | "moderate" | "severe" | "replace" {
@@ -25,6 +28,9 @@ export async function POST(req: NextRequest) {
 
     let parsedResult: any = {};
     let pdfTextExtracted = false;
+    // Returned to the client so that, once the user saves the case, the save can
+    // link this call's cost to the resulting quotation (it doesn't exist yet here).
+    let usageLogId: number | null = null;
 
     // 1. Try direct PDF text parsing via pdf-parse
     let pdfParse: any = null;
@@ -266,20 +272,47 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
         // require streaming (it refuses a plain non-streaming call it estimates could
         // run past 10 minutes), which also sidesteps any single-request timeout on our
         // own infra — verified end-to-end at ~125s for the 277-item/31-page case.
-        const stream = anthropic.messages.stream(
-          {
-            model: "claude-sonnet-5",
-            max_tokens: 32000,
-            thinking: { type: "disabled" },
-            messages: [{ role: "user", content: contentParts }],
-          },
-          {
-            headers: {
-              "anthropic-beta": "pdfs-2024-09-25",
+        const startedAt = Date.now();
+        let response: Anthropic.Message;
+        try {
+          const stream = anthropic.messages.stream(
+            {
+              model: EXTRACT_MODEL,
+              max_tokens: 32000,
+              thinking: { type: "disabled" },
+              messages: [{ role: "user", content: contentParts }],
             },
-          }
-        );
-        const response = await stream.finalMessage();
+            {
+              headers: {
+                "anthropic-beta": "pdfs-2024-09-25",
+              },
+            }
+          );
+          response = await stream.finalMessage();
+        } catch (apiErr) {
+          // A failed call still costs money and still took time — record it so the
+          // spend burned on retries is visible, then rethrow into the existing handler.
+          await recordUsage({
+            route: "/api/extract-quote",
+            model: EXTRACT_MODEL,
+            success: false,
+            errorMessage: apiErr instanceof Error ? apiErr.message : String(apiErr),
+            durationMs: Date.now() - startedAt,
+          });
+          throw apiErr;
+        }
+
+        // stop_reason "max_tokens" means the JSON was cut off — the call is billed
+        // in full but yields nothing usable, which is exactly what this table exists
+        // to surface.
+        usageLogId = await recordUsage({
+          route: "/api/extract-quote",
+          model: EXTRACT_MODEL,
+          usage: response.usage,
+          success: response.stop_reason !== "max_tokens",
+          stopReason: response.stop_reason,
+          durationMs: Date.now() - startedAt,
+        });
 
         const respText = response.content
           .filter((c): c is Anthropic.TextBlock => c.type === "text")
@@ -390,6 +423,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
       success: true,
       metadata,
       items: cleanItems,
+      usageLogId,
     });
   } catch (err) {
     console.error("Extract quote error:", err);

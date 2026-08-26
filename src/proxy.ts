@@ -12,6 +12,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/login",
   "/api/inspect", // customer inspection flow — authenticated by URL token, not employee session
   "/api/inspection-validate", // called server-to-server from the inspection submit route
+  "/api/usage-export", // external monitoring dashboard — authenticated by USAGE_EXPORT_SECRET in the route itself
 ];
 
 // Mirrors the restriction PortalLayout.tsx already applies to the matching UI pages

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { estimateTotal } from "@/lib/priceLookup";
 import { getSession } from "@/lib/session";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { recordUsage } from "@/lib/aiUsage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -105,6 +106,10 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    // Captured here because the null check above doesn't narrow inside the
+    // analyzeOne closure below.
+    const sessionEmail = session.email;
+    const sessionBranch = session.branchName;
 
     const rl = checkRateLimit(`analyze:${session.id}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
     if (!rl.allowed) {
@@ -144,6 +149,9 @@ export async function POST(req: NextRequest) {
     const severityRank = { minor: 0, moderate: 1, severe: 2, total_loss: 3 } as const;
 
     async function analyzeOne(img: { data: string; mediaType: string }): Promise<Record<string, unknown>> {
+      // One call per image, and a case can carry up to MAX_IMAGES_PER_REQUEST of
+      // them — so this route's cost scales with photo count, not case count.
+      const startedAt = Date.now();
       try {
         const msg = await client.messages.create({
           model: MODEL,
@@ -168,6 +176,16 @@ export async function POST(req: NextRequest) {
               ],
             },
           ],
+        });
+
+        await recordUsage({
+          route: "/api/analyze",
+          model: MODEL,
+          usage: msg.usage,
+          stopReason: msg.stop_reason,
+          durationMs: Date.now() - startedAt,
+          userEmail: sessionEmail,
+          branchName: sessionBranch,
         });
 
         const text = msg.content
@@ -207,6 +225,15 @@ export async function POST(req: NextRequest) {
         return parsed;
       } catch (err) {
         console.warn("Vision model call notice:", err);
+        await recordUsage({
+          route: "/api/analyze",
+          model: MODEL,
+          success: false,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          durationMs: Date.now() - startedAt,
+          userEmail: sessionEmail,
+          branchName: sessionBranch,
+        });
         return {
           vehicleMake: body.vehicleMake || null,
           vehicleColor: null,
