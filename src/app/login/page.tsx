@@ -54,20 +54,21 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[500px] bg-gradient-to-tr from-sky-200/50 via-blue-200/30 to-indigo-100/20 rounded-full blur-[140px] pointer-events-none animate-pulse-glow" />
 
       {/* Top Navbar */}
-      <header className="p-6 flex items-center justify-between z-10 max-w-7xl mx-auto w-full">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-full overflow-hidden shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
+      <header className="p-4 sm:p-6 flex items-center justify-between gap-3 z-10 max-w-7xl mx-auto w-full">
+        <Link href="/" className="flex items-center gap-2.5 group min-w-0">
+          <div className="w-10 h-10 rounded-full overflow-hidden shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300 shrink-0">
             <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
           </div>
-          <div className="flex flex-col leading-tight">
-            <span className="font-extrabold text-xl tracking-tight text-[#1d1d1f] group-hover:text-[#0071e3] transition">
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="font-extrabold text-lg sm:text-xl tracking-tight text-[#1d1d1f] group-hover:text-[#0071e3] transition truncate">
               ClaimThunJai
             </span>
-            <span className="text-xs text-slate-500 font-medium">AI Damage Detection</span>
+            {/* Tagline is the first thing to go on a phone — the brand name has to fit */}
+            <span className="hidden sm:block text-xs text-slate-500 font-medium">AI Damage Detection</span>
           </div>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="flex items-center text-xs font-bold border border-sky-200 rounded-full overflow-hidden p-0.5 bg-white/90 shadow-xs">
             <button
               onClick={() => setLang("th")}
@@ -87,8 +88,9 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <Link href="/" className="text-sm font-semibold text-slate-700 hover:text-[#0071e3] transition">
-            ← {lang === "th" ? "กลับหน้าแรก" : "Back to Home"}
+          <Link href="/" className="text-sm font-semibold text-slate-700 hover:text-[#0071e3] transition whitespace-nowrap">
+            <span aria-hidden="true">←</span>
+            <span className="hidden sm:inline"> {lang === "th" ? "กลับหน้าแรก" : "Back to Home"}</span>
           </Link>
         </div>
       </header>

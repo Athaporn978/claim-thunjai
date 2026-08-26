@@ -56,6 +56,13 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: SECURITY_HEADERS,
       },
+      // No /sw.js entry here on purpose. The PWA guide suggests pinning Content-Type
+      // and Cache-Control on the worker, but files under public/ are served by Next's
+      // static handler, which sets both itself and wins over headers() — verified
+      // against a production build. What it sets is already what we need:
+      // "application/javascript; charset=UTF-8" and "public, max-age=0", the latter
+      // forcing an ETag revalidation on every request, so a fixed worker always
+      // propagates on the next load.
     ];
   },
   async redirects() {

@@ -597,9 +597,11 @@ function Wizard() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <button onClick={tryLeave} className="text-sm text-slate-500 hover:text-[var(--navy-900)]">← {lang === "th" ? "กลับไปรายการ" : "Back to list"}</button>
+            {/* Sidebar collapse shortcut — desktop only; below lg the sidebar is already
+                an off-canvas drawer, so there is nothing to collapse for more width. */}
             <button
               onClick={toggleSidebar}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-50 text-[#0071e3] border border-sky-200 hover:bg-[#0071e3] hover:text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-50 text-[#0071e3] border border-sky-200 hover:bg-[#0071e3] hover:text-white text-xs font-bold transition cursor-pointer shadow-2xs"
               title={isCollapsed ? (lang === "th" ? "แสดงแถบเมนู" : "Expand Sidebar") : (lang === "th" ? "ย่อแถบเมนูเพื่อขยายตารางเต็มจอ" : "Collapse Sidebar")}
             >
               {isCollapsed ? (lang === "th" ? "⇉ แสดงเมนู" : "⇉ Show Sidebar") : (lang === "th" ? "⇇ ย่อเมนู (ขยายตารางเต็มจอ)" : "⇇ Focus Mode")}

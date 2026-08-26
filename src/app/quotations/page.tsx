@@ -298,18 +298,22 @@ export default function QuotationsPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+      {/* One card per row on phones: a half-width card can't fit a baht total without
+          wrapping it mid-number, and vertical space is the cheap axis here. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div className="card !p-5">
           <div className="text-xs text-slate-500 font-semibold">{lang === "th" ? "จำนวนใบเสนอราคา" : "Quotations"}</div>
-          <div className="text-3xl font-bold text-[var(--navy-900)] mt-1">{filteredRows.length}</div>
+          {/* Baht totals reach 10+ characters, which overflows a half-width card on a
+              phone at text-3xl — scale the figure up only once there's room for it. */}
+          <div className="text-2xl md:text-3xl font-bold text-[var(--navy-900)] mt-1">{filteredRows.length}</div>
         </div>
         <div className="card !p-5 ring-2 ring-[var(--orange-500)]">
           <div className="text-xs text-slate-500 font-semibold">{lang === "th" ? "ประหยัดได้รวม (Saving)" : "Total Saving"}</div>
-          <div className="text-3xl font-bold text-[var(--orange-600)] mt-1">฿{fmtBaht(totalSaving, lang)}</div>
+          <div className="text-2xl md:text-3xl font-bold text-[var(--orange-600)] mt-1 break-words">฿{fmtBaht(totalSaving, lang)}</div>
         </div>
         <div className="card !p-5">
           <div className="text-xs text-slate-500 font-semibold">{lang === "th" ? "Saving เฉลี่ย/ใบ" : "Avg Saving"}</div>
-          <div className="text-3xl font-bold text-emerald-700 mt-1">฿{fmtBaht(filteredRows.length ? totalSaving / filteredRows.length : 0, lang)}</div>
+          <div className="text-2xl md:text-3xl font-bold text-emerald-700 mt-1 break-words">฿{fmtBaht(filteredRows.length ? totalSaving / filteredRows.length : 0, lang)}</div>
         </div>
       </div>
 
