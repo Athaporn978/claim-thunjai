@@ -198,9 +198,14 @@ export default function ReportsPageLuxury() {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const name = (q.customerName || "").toLowerCase();
-        const plate = (q.licensePlate || "").toLowerCase();
         const qNo = (q.quotationNo || "").toLowerCase();
-        if (!name.includes(query) && !plate.includes(query) && !qNo.includes(query)) {
+        // Plates are written inconsistently ("2ขณ 2963 กทม" vs "2ขณ2963กทม"), so
+        // compare them with spaces stripped from both sides — typing the plate with
+        // or without spaces finds the same car either way. Name and quotation number
+        // keep exact matching, since names legitimately contain spaces.
+        const plateNoSpace = (q.licensePlate || "").toLowerCase().replace(/\s+/g, "");
+        const queryNoSpace = query.replace(/\s+/g, "");
+        if (!name.includes(query) && !plateNoSpace.includes(queryNoSpace) && !qNo.includes(query)) {
           return false;
         }
       }
@@ -402,6 +407,19 @@ export default function ReportsPageLuxury() {
 
   // Recharts consumes the same buckets groupedChartData already produces; the old
   // hand-built bezier path memo below is what it replaces.
+  // Which vehicles the current search actually matched — surfaced beside the box so
+  // it is obvious whether the right car was found before trusting the figures. A
+  // partial term like "2963" can match several plates at once.
+  const matchedPlates = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const seen = new Set<string>();
+    for (const q of filtered) {
+      const p = (q.licensePlate || "").trim();
+      if (p) seen.add(p);
+    }
+    return Array.from(seen);
+  }, [filtered, searchQuery]);
+
   const rechartsSeries = useMemo(
     () =>
       (groupedChartData.labels || []).map((label: string, i: number) => ({
@@ -551,6 +569,35 @@ export default function ReportsPageLuxury() {
                 className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-full sm:w-80 md:w-96 text-slate-800"
               />
             </div>
+
+            {searchQuery.trim() && (
+              <div className="flex flex-wrap items-center gap-1.5 max-w-full">
+                {matchedPlates.length === 0 ? (
+                  <span className="text-[11px] font-bold text-slate-400">
+                    {lang === "th" ? "ไม่พบทะเบียนที่ตรงกัน" : "No matching plate"}
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {lang === "th" ? "ตรงกับ:" : "Matched:"}
+                    </span>
+                    {matchedPlates.slice(0, 4).map((p) => (
+                      <span
+                        key={p}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0071e3] bg-[#eef6ff] border border-[#cce5ff] rounded-lg px-2 py-0.5 whitespace-nowrap"
+                      >
+                        🚗 {p}
+                      </span>
+                    ))}
+                    {matchedPlates.length > 4 && (
+                      <span className="text-[11px] font-bold text-slate-400">
+                        +{matchedPlates.length - 4}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Branch Multi-Select Dropdown (with RBAC Scoping) */}
             <div className="relative">
