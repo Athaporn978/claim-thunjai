@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/lib/SidebarContext";
@@ -10,6 +10,28 @@ import { useLang } from "@/lib/LangContext";
 function PortalShell({ children }: { children: React.ReactNode }) {
   const { isMobileOpen, openMobile, closeMobile, isCollapsed, toggleSidebar } = useSidebar();
   const { lang } = useLang();
+  const router = useRouter();
+  const [portalUser, setPortalUser] = useState<{ name: string; branchName: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) {
+        const u = JSON.parse(stored);
+        setPortalUser({
+          name: u.name || "ผู้ใช้งาน",
+          branchName: u.branchName || u.branch?.name || u.roleName || "",
+        });
+      }
+    } catch {}
+  }, []);
+
+  const handleLogout = () => {
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("claim_user_profile");
+    router.push("/login");
+  };
 
   return (
     <div className="h-screen max-h-screen flex bg-[#f0f4fd] overflow-hidden print:h-auto print:max-h-none print:bg-white print:block print:overflow-visible">
@@ -54,6 +76,30 @@ function PortalShell({ children }: { children: React.ReactNode }) {
             <img src="/logo/Htech_logo.webp" alt="H Technology" className="w-full h-full object-cover" />
           </div>
           <span className="font-extrabold tracking-tight truncate">ClaimThunJai</span>
+
+          {/* User info + Logout — right side of top bar */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {portalUser && (
+              <>
+                <div className="hidden sm:flex flex-col items-end leading-tight">
+                  <span className="text-xs font-bold text-white truncate max-w-[140px]">{portalUser.name}</span>
+                  {portalUser.branchName && (
+                    <span className="text-[10px] text-slate-400 truncate max-w-[140px]">{portalUser.branchName}</span>
+                  )}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  title={lang === "th" ? "ออกจากระบบ" : "Logout"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1b2b52] hover:bg-red-600/80 text-slate-200 hover:text-white transition active:scale-95 cursor-pointer text-xs font-bold"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                  <span className="hidden sm:inline">{lang === "th" ? "ออก" : "Logout"}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="p-4 sm:p-6 lg:p-8 print:p-0 print:m-0">{children}</div>

@@ -190,6 +190,8 @@ model Quotation {
   createdByName  String?
   createdByEmail String?
 
+  isArchived Boolean @default(false)
+
   branchId  String?
   branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 

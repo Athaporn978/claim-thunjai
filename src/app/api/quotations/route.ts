@@ -25,9 +25,11 @@ async function nextQuotationNo(tx: Prisma.TransactionClient) {
 }
 
 // GET /api/quotations → list (newest first)
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const showArchived = req.nextUrl.searchParams.get("showArchived") === "true";
     const rows = await prisma.quotation.findMany({
+      where: showArchived ? {} : { isArchived: false },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -42,6 +44,8 @@ export async function GET() {
         totalControlled: true,
         totalSaving: true,
         createdByName: true,
+        createdByEmail: true,
+        isArchived: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { items: true } },
