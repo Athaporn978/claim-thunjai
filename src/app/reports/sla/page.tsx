@@ -276,23 +276,7 @@ export default function SLAReportPage() {
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Quick Search */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={lang === "th" ? "ค้นหาด้วยชื่อ, ทะเบียนรถ, หรือเลขที่ใบเสนอราคา..." : "Search..."}
-                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-full sm:w-80 md:w-96 text-slate-800"
-              />
-            </div>
-
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             {/* Creation Mode Filter */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-1 flex items-center gap-1 text-xs font-bold text-slate-700 shadow-xs">
               <button
@@ -319,6 +303,22 @@ export default function SLAReportPage() {
               >
                 <span>✍️</span> คีย์ Manual
               </button>
+            </div>
+
+            {/* Quick Search */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={lang === "th" ? "ค้นหา..." : "Search..."}
+                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-48 sm:w-56 text-slate-800"
+              />
             </div>
 
             {/* Branch Multi-Select Dropdown — hidden, reserved for future use */}
