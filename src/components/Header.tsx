@@ -19,6 +19,9 @@ export function Header() {
     pathname?.startsWith("/quotation") ||
     pathname?.startsWith("/reports") ||
     pathname?.startsWith("/docs") ||
+    // Design preview renders its own full shell (top bar + sidebar); the public
+    // header would stack on top of it. Temporary — goes when /ui-preview does.
+    pathname?.startsWith("/ui-preview") ||
     pathname?.startsWith("/login")
   ) {
     return null;
