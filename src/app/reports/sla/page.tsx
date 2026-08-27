@@ -264,9 +264,9 @@ export default function SLAReportPage() {
   };
 
   return (
-    <div className="p-6 md:p-10 text-[#1d1d1f] space-y-8 max-w-[1600px] mx-auto animate-fade-in font-sans">
+    <div className="p-6 md:p-8 text-[#1d1d1f] space-y-6 max-w-[1600px] mx-auto animate-fade-in font-sans">
       {/* Unified Search, Filters & Date Preset Header Panel */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
         {/* Row 1: Title, Search, Creation Mode, Branch & Refresh */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export default function SLAReportPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={lang === "th" ? "ค้นหาด้วยชื่อ, ทะเบียนรถ, หรือเลขที่ใบเสนอราคา..." : "Search..."}
-                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-72 sm:w-80 md:w-96 transition-all focus:w-[420px] text-slate-800"
+                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-full sm:w-80 md:w-96 text-slate-800"
               />
             </div>
 
@@ -321,8 +321,8 @@ export default function SLAReportPage() {
               </button>
             </div>
 
-            {/* Branch Multi-Select Dropdown (with RBAC Scoping) */}
-            <div className="relative">
+            {/* Branch Multi-Select Dropdown — hidden, reserved for future use */}
+            <div className="hidden relative">
               <button
                 onClick={() => {
                   if (userRole === "ADMIN") setShowBranchDropdown(!showBranchDropdown);
@@ -398,6 +398,15 @@ export default function SLAReportPage() {
               <svg className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
+            </button>
+
+            {/* Export Button */}
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2.5 rounded-2xl bg-[#0071e3] hover:bg-blue-600 text-white text-xs font-extrabold transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
+            >
+              <span>📥</span>
+              <span>{lang === "th" ? "ส่งออกรายงาน" : "Export Report"}</span>
             </button>
           </div>
         </div>

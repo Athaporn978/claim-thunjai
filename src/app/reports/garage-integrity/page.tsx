@@ -269,8 +269,8 @@ export default function GarageIntegrityReportPage() {
 
   return (
     <div className="p-6 md:p-8 text-[#1d1d1f] space-y-6 max-w-[1600px] mx-auto animate-fade-in font-sans">
-      {/* Unified Search, Filters & Branch Header Panel (SLA Theme) */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+      {/* Unified Search, Filters & Branch Header Panel */}
+      <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
         {/* Row 1: Title, Branch Badge, Search Box & Back Button */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
@@ -278,11 +278,7 @@ export default function GarageIntegrityReportPage() {
             <h1 className="text-xl font-extrabold text-[var(--navy-900)]">
               {lang === "th" ? "รายงานคะแนนอู่/ศูนย์" : "Garage & Service Center Rating Report"}
             </h1>
-            {!isSuperAdmin && (
-              <span className="px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-2xl flex items-center gap-1 shadow-2xs">
-                🔒 {lang === "th" ? `${userBranch} (สังกัดของคุณ)` : `${userBranch} (Your Branch)`}
-              </span>
-            )}
+            {/* Branch badge hidden — reserved for future use */}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -298,80 +294,79 @@ export default function GarageIntegrityReportPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={lang === "th" ? "ค้นหาด้วยชื่ออู่ หรือประเภทศูนย์บริการ..." : "Search..."}
-                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-72 sm:w-80 md:w-96 transition-all focus:w-[420px] text-slate-800"
+                className="pl-10 pr-4 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold w-full sm:w-80 md:w-96 text-slate-800"
               />
             </div>
 
             {/* Refresh Button */}
+            {/* Refresh Button */}
             <button
               onClick={() => loadData(true)}
               disabled={refreshing}
-              className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer border border-slate-200"
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition active:scale-95 cursor-pointer"
               title={lang === "th" ? "รีเฟรชข้อมูล" : "Refresh"}
             >
               <svg className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
             </button>
 
-            {/* Back Button */}
-            <Link
-              href="/reports"
-              className="px-4 py-2 rounded-2xl bg-[#0071e3] text-white font-extrabold text-xs shadow-md hover:bg-blue-700 transition flex items-center gap-1.5 cursor-pointer"
+            {/* Export Button */}
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2.5 rounded-2xl bg-[#0071e3] hover:bg-blue-600 text-white text-xs font-extrabold transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
             >
-              ← {lang === "th" ? "กลับหน้ารวมรายงาน" : "Back to Reports"}
-            </Link>
+              <span>📥</span>
+              <span>{lang === "th" ? "ส่งออกรายงาน" : "Export Report"}</span>
+            </button>
           </div>
         </div>
 
-        {/* Row 2: Date Filter Presets */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-            <span className="text-slate-400 mr-1">{lang === "th" ? "ช่วงเวลา:" : "Date Filter:"}</span>
+        {/* Row 2: Integrated Date Preset Bar */}
+        <div className="border-t border-slate-100/90 pt-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {[
-              { id: "all", labelTh: "ทั้งหมด", labelEn: "All" },
-              { id: "today", labelTh: "วันนี้", labelEn: "Today" },
-              { id: "7days", labelTh: "7 วันล่าสุด", labelEn: "7 Days" },
-              { id: "30days", labelTh: "30 วันล่าสุด", labelEn: "30 Days" },
-              { id: "month", labelTh: "เดือนนี้", labelEn: "This Month" },
-              { id: "year", labelTh: "ปีนี้", labelEn: "This Year" },
-              { id: "custom", labelTh: "กำหนดช่วงวันเอง", labelEn: "Custom Date" },
-            ].map((p) => (
+              { id: "all", label: "ทั้งหมด" },
+              { id: "today", label: "วันนี้" },
+              { id: "7days", label: "7 วันล่าสุด" },
+              { id: "30days", label: "30 วันล่าสุด" },
+              { id: "month", label: "เดือนนี้" },
+              { id: "year", label: "ปีนี้" },
+              { id: "custom", label: "กำหนดช่วงวันเอง" },
+            ].map((preset) => (
               <button
-                key={p.id}
-                onClick={() => setDatePreset(p.id)}
-                className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
-                  datePreset === p.id ? "bg-[#0071e3] text-white shadow-xs" : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                key={preset.id}
+                onClick={() => setDatePreset(preset.id)}
+                className={`px-4 py-2 rounded-2xl font-extrabold transition text-xs cursor-pointer ${
+                  datePreset === preset.id
+                    ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60"
                 }`}
               >
-                {lang === "th" ? p.labelTh : p.labelEn}
+                {preset.label}
               </button>
             ))}
           </div>
 
-          <div className="text-[11px] text-slate-400 font-medium">
-            {lang === "th" ? "ประมวลผลสถิติจริงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้ว (Completed) ในความดูแลของสาขา" : "Calculated from completed claims under branch management"}
-          </div>
+          {datePreset === "custom" && (
+            <div className="flex items-center gap-3 text-xs font-bold bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 shadow-xs">
+              <span className="text-slate-500 font-medium">จาก:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 text-slate-800 font-mono text-xs focus:outline-none focus:border-[#0071e3]"
+              />
+              <span className="text-slate-500 font-medium">ถึง:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 text-slate-800 font-mono text-xs focus:outline-none focus:border-[#0071e3]"
+              />
+            </div>
+          )}
         </div>
-
-        {/* Custom Date Inputs */}
-        {datePreset === "custom" && (
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 animate-fadeIn">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50 font-bold focus:outline-none focus:border-[#0071e3]"
-            />
-            <span className="text-xs font-bold text-slate-400">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50 font-bold focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-        )}
 
         {/* Row 3: Status Filter Pills */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">

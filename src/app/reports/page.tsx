@@ -62,6 +62,7 @@ export default function ReportsPageLuxury() {
   const [selectedBranches, setSelectedBranches] = useState<string[]>(MOCK_BRANCHES);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'draft' | 'pending_review' | 'pending_approval' | 'approved'
 
   // Role & Branch Access Control (RBAC)
   const [userRole, setUserRole] = useState<string>("ADMIN");
@@ -190,9 +191,15 @@ export default function ReportsPageLuxury() {
         if (!matchSel) return false;
       }
 
-      // 2. Completed Status Filter (Only include completed/approved cases in reports)
-      const isCompleted = q.status === "approved" || q.status === "completed" || q.status === "finalized";
-      if (!isCompleted) return false;
+      // 2. Status filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "approved") {
+          const isApproved = q.status === "approved" || q.status === "completed" || q.status === "finalized";
+          if (!isApproved) return false;
+        } else {
+          if (q.status !== statusFilter) return false;
+        }
+      }
 
       // 3. Search Query Filter
       if (searchQuery.trim()) {
@@ -243,7 +250,7 @@ export default function ReportsPageLuxury() {
 
       return true;
     });
-  }, [quotations, selectedBranches, searchQuery, datePreset, startDate, endDate, userRole, userBranch]);
+  }, [quotations, selectedBranches, searchQuery, statusFilter, datePreset, startDate, endDate, userRole, userBranch]);
 
   // Executive KPI Metrics
   const metrics = useMemo(() => {
@@ -570,8 +577,26 @@ export default function ReportsPageLuxury() {
               />
             </div>
 
-            {/* Branch Multi-Select Dropdown (with RBAC Scoping) */}
+            {/* Status Filter Dropdown */}
             <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="pl-3.5 pr-8 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold text-slate-800 cursor-pointer appearance-none"
+              >
+                <option value="all">📋 ทุกสถานะ</option>
+                <option value="draft">📝 บันทึกร่าง</option>
+                <option value="pending_review">🔍 รอตรวจสอบ</option>
+                <option value="pending_approval">⏳ รออนุมัติ</option>
+                <option value="approved">✅ อนุมัติแล้ว</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
+            {/* Branch Multi-Select Dropdown (with RBAC Scoping) — hidden, reserved for future use */}
+            <div className="hidden relative">
               <button
                 onClick={() => {
                   if (userRole === "ADMIN") setShowBranchDropdown(!showBranchDropdown);
