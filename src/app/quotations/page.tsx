@@ -500,25 +500,54 @@ export default function QuotationsPage() {
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">📝 {lang === "th" ? "บันทึกร่าง" : "Draft"}</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                      {r.status === "pending_approval" ? (
-                        <Link href={`/quotations/${r.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0071e3] text-white hover:bg-blue-700 text-xs font-extrabold transition shadow-md shadow-blue-500/20 cursor-pointer animate-pulse">
-                          🛡️ {lang === "th" ? "ตรวจอนุมัติ" : "Review & Approve"}
-                        </Link>
-                      ) : (
-                        <Link href={`/quotations/${r.id}`} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-50 text-[#0071e3] hover:bg-[#0071e3] hover:text-white text-xs font-bold transition shadow-2xs">
-                          {lang === "th" ? "รายงาน" : "Report"}
-                        </Link>
-                      )}
-                      {isCompleted ? (
-                        <span className="ml-2 text-slate-300 text-xs font-semibold cursor-not-allowed select-none opacity-50">
-                          {lang === "th" ? "แก้ไข" : "Edit"}
-                        </span>
-                      ) : (
-                        <Link href={`/quotation/new?id=${r.id}`} className="ml-2 text-slate-600 hover:text-slate-900 text-xs font-semibold hover:underline">
-                          {lang === "th" ? "แก้ไข" : "Edit"}
-                        </Link>
-                      )}
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5">
+                        {/* รายงาน / ตรวจอนุมัติ */}
+                        {r.status === "pending_approval" ? (
+                          <Link
+                            href={`/quotations/${r.id}`}
+                            title={lang === "th" ? "ตรวจอนุมัติ" : "Review & Approve"}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#0071e3] text-white hover:bg-blue-700 transition animate-pulse shadow-sm shadow-blue-500/30 cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/quotations/${r.id}`}
+                            title={lang === "th" ? "ดูรายงาน" : "View Report"}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-[#0071e3] hover:bg-[#0071e3] hover:text-white border border-blue-100 hover:border-[#0071e3] transition cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </Link>
+                        )}
+
+                        {/* แก้ไข */}
+                        {isCompleted ? (
+                          <span
+                            title={lang === "th" ? "เคสนี้ปิดจบแล้ว ไม่สามารถแก้ไขได้" : "Completed — read only"}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-100 text-slate-300 cursor-not-allowed select-none"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <Link
+                            href={`/quotation/new?id=${r.id}`}
+                            title={lang === "th" ? "แก้ไข" : "Edit"}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-300 transition cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
