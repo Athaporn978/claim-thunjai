@@ -807,10 +807,12 @@ export default function ReportsPageLuxury() {
             <span className="text-xs font-bold text-orange-500 uppercase tracking-widest block">Total Optimization</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ยอด Saving รวมสุทธิ</h3>
           </div>
-          <div className="my-auto flex flex-col justify-center items-center">
-            <div className="text-3xl sm:text-4xl font-black text-orange-600 tracking-tight">
-              ฿{metrics.totalSaving.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+          <div className="my-auto flex flex-col justify-center items-center w-full px-1">
+            {(() => {
+              const s = metrics.totalSaving.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const cls = s.length > 13 ? "text-lg sm:text-xl" : s.length > 10 ? "text-xl sm:text-2xl" : s.length > 8 ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
+              return <div className={`${cls} font-black text-orange-600 tracking-tight whitespace-nowrap leading-tight`}>฿{s}</div>;
+            })()}
             <div className="text-xs font-bold text-slate-500 mt-1">ประหยัดได้รวมทั้งหมด</div>
           </div>
           <div className="text-[10px] text-slate-400 font-medium border-t border-slate-100 pt-2 flex items-center justify-center gap-1">
@@ -825,10 +827,12 @@ export default function ReportsPageLuxury() {
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Average Optimization</span>
             <h3 className="text-sm font-extrabold text-[var(--navy-900)]">ยอด Saving เฉลี่ย/รายการ</h3>
           </div>
-          <div className="my-auto flex flex-col justify-center items-center">
-            <div className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight">
-              ฿{metrics.avgSaving.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+          <div className="my-auto flex flex-col justify-center items-center w-full px-1">
+            {(() => {
+              const s = metrics.avgSaving.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const cls = s.length > 13 ? "text-lg sm:text-xl" : s.length > 10 ? "text-xl sm:text-2xl" : s.length > 8 ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
+              return <div className={`${cls} font-black text-emerald-600 tracking-tight whitespace-nowrap leading-tight`}>฿{s}</div>;
+            })()}
             <div className="text-xs font-bold text-slate-500 mt-1">ยอดเงิน Saving เฉลี่ยต่อใบ</div>
           </div>
           <div className="text-[10px] text-slate-400 font-medium border-t border-slate-100 pt-2 flex items-center justify-center gap-1">
