@@ -50,6 +50,7 @@ export default function SLAReportPage() {
   const [selectedBranches, setSelectedBranches] = useState<string[]>(MOCK_BRANCHES);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [creationModeFilter, setCreationModeFilter] = useState<string>("all"); // 'all' | 'ai_extract' | 'manual'
+  const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'draft' | 'pending_review' | 'pending_approval' | 'approved'
   const [searchQuery, setSearchQuery] = useState("");
 
   // Date Filter States
@@ -160,9 +161,15 @@ export default function SLAReportPage() {
         if (!matchSel) return false;
       }
 
-      // 2. Completed Status Filter (Only include completed/approved cases in SLA report)
-      const isCompleted = q.status === "approved" || q.status === "completed" || q.status === "finalized";
-      if (!isCompleted) return false;
+      // 2. Status filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "approved") {
+          const isApproved = q.status === "approved" || q.status === "completed" || q.status === "finalized";
+          if (!isApproved) return false;
+        } else {
+          if (q.status !== statusFilter) return false;
+        }
+      }
 
       // 3. Creation Mode Filter
       if (creationModeFilter !== "all" && q.creationMode !== creationModeFilter) return false;
@@ -211,7 +218,7 @@ export default function SLAReportPage() {
 
       return true;
     });
-  }, [quotations, selectedBranches, creationModeFilter, searchQuery, datePreset, startDate, endDate, userRole, userBranch]);
+  }, [quotations, selectedBranches, creationModeFilter, statusFilter, searchQuery, datePreset, startDate, endDate, userRole, userBranch]);
 
   // SLA Executive Metrics
   const metrics = useMemo(() => {
@@ -303,6 +310,24 @@ export default function SLAReportPage() {
               >
                 <span>✍️</span> คีย์ Manual
               </button>
+            </div>
+
+            {/* Status Filter Dropdown */}
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="pl-3.5 pr-8 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold text-slate-800 cursor-pointer appearance-none"
+              >
+                <option value="all">📋 ทุกสถานะ</option>
+                <option value="draft">📝 บันทึกร่าง</option>
+                <option value="pending_review">🔍 รอตรวจสอบ</option>
+                <option value="pending_approval">⏳ รออนุมัติ</option>
+                <option value="approved">✅ อนุมัติแล้ว</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </div>
             </div>
 
             {/* Quick Search */}

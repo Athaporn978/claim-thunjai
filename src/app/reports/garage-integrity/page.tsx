@@ -21,7 +21,8 @@ type GarageMetric = {
 export default function GarageIntegrityReportPage() {
   const { lang } = useLang();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all"); // garage rating: all | excellent | fair | warning
+  const [quoteStatusFilter, setQuoteStatusFilter] = useState("all"); // quotation status: all | draft | pending_review | pending_approval | approved
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [availableBranches, setAvailableBranches] = useState<string[]>([]);
   const [rawQuotes, setRawQuotes] = useState<any[]>([]);
@@ -121,8 +122,15 @@ export default function GarageIntegrityReportPage() {
   const garages = useMemo(() => {
     // 1. Filter ONLY completed/approved quotations with identical RBAC & Date rules as Saving & SLA reports
     const completedQuotes = rawQuotes.filter((q) => {
-      const isCompleted = q.status === "completed" || q.status === "approved" || q.status === "finalized";
-      if (!isCompleted) return false;
+      // Quotation status filter
+      if (quoteStatusFilter !== "all") {
+        if (quoteStatusFilter === "approved") {
+          const isApproved = q.status === "approved" || q.status === "completed" || q.status === "finalized";
+          if (!isApproved) return false;
+        } else {
+          if (q.status !== quoteStatusFilter) return false;
+        }
+      }
 
       const qb = q.branch?.name || q.branchName || "";
       const isNotAdminCase = (q as any).createdByEmail !== "admin@htechnology.com";
@@ -248,7 +256,7 @@ export default function GarageIntegrityReportPage() {
         branchName: g.branchName,
       };
     });
-  }, [rawQuotes, isSuperAdmin, userBranch, selectedBranch, datePreset, startDate, endDate]);
+  }, [rawQuotes, isSuperAdmin, userBranch, selectedBranch, quoteStatusFilter, datePreset, startDate, endDate]);
 
   // Search & Rating Status Filter
   const filtered = useMemo(() => {
@@ -298,7 +306,24 @@ export default function GarageIntegrityReportPage() {
               />
             </div>
 
-            {/* Refresh Button */}
+            {/* Status Filter Dropdown */}
+            <div className="relative">
+              <select
+                value={quoteStatusFilter}
+                onChange={(e) => setQuoteStatusFilter(e.target.value)}
+                className="pl-3.5 pr-8 py-2 text-xs border border-slate-200 bg-slate-50 rounded-2xl focus:outline-none focus:border-[#0071e3] font-bold text-slate-800 cursor-pointer appearance-none"
+              >
+                <option value="all">📋 ทุกสถานะ</option>
+                <option value="draft">📝 บันทึกร่าง</option>
+                <option value="pending_review">🔍 รอตรวจสอบ</option>
+                <option value="pending_approval">⏳ รออนุมัติ</option>
+                <option value="approved">✅ อนุมัติแล้ว</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
             {/* Refresh Button */}
             <button
               onClick={() => loadData(true)}
