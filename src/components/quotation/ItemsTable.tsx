@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   type QuotationItemInput,
+  type QuotationPhoto,
   type ItemType,
   lineQuoted,
   lineControlled,
@@ -71,6 +72,7 @@ export function ItemsTable({
   vehicleCategory,
   vehicleSize,
   lang,
+  photos = [],
 }: {
   title: string;
   type: ItemType;
@@ -79,8 +81,11 @@ export function ItemsTable({
   vehicleCategory: string;
   vehicleSize: string;
   lang: "th" | "en";
+  photos?: QuotationPhoto[];
 }) {
   const [pickerRow, setPickerRow] = useState<number | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const rows = items.filter((i) => i.type === type);
   const st = sectionTotals(items, type);
 
@@ -120,6 +125,14 @@ export function ItemsTable({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h3 className="text-lg font-bold text-[var(--navy-900)]">{title}</h3>
         <div className="flex items-center gap-2">
+          {photos.length > 0 && (
+            <button
+              onClick={() => setPhotoOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 text-[#0071e3] border border-blue-200 text-xs font-bold hover:bg-blue-100 transition cursor-pointer shadow-2xs"
+            >
+              📷 {lang === "th" ? `ดูรูปรถ (${photos.length})` : `Photos (${photos.length})`}
+            </button>
+          )}
           {rows.length > 0 && (
             <button
               onClick={() => {
@@ -141,6 +154,72 @@ export function ItemsTable({
           )}
         </div>
       </div>
+
+      {/* ── Photo modal (conditional mount = no decode until opened) ── */}
+      {photoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) { setPhotoOpen(false); setLightboxIdx(null); } }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden mx-4">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+              <span className="font-bold text-slate-800 text-sm">
+                📷 {lang === "th" ? `รูปรถ (${photos.length} รูป)` : `Car Photos (${photos.length})`}
+              </span>
+              <button onClick={() => { setPhotoOpen(false); setLightboxIdx(null); }} className="w-7 h-7 rounded-full hover:bg-slate-100 text-slate-500 flex items-center justify-center text-lg leading-none">✕</button>
+            </div>
+
+            {/* Lightbox (single large image) */}
+            {lightboxIdx !== null ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex items-center justify-center bg-slate-900 relative overflow-hidden" style={{ minHeight: 320 }}>
+                  <img
+                    src={photos[lightboxIdx].url}
+                    alt={photos[lightboxIdx].caption || `รูปที่ ${lightboxIdx + 1}`}
+                    className="max-h-full max-w-full object-contain"
+                    style={{ maxHeight: "60vh" }}
+                  />
+                  {lightboxIdx > 0 && (
+                    <button onClick={() => setLightboxIdx(lightboxIdx - 1)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-xl font-bold transition">‹</button>
+                  )}
+                  {lightboxIdx < photos.length - 1 && (
+                    <button onClick={() => setLightboxIdx(lightboxIdx + 1)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-xl font-bold transition">›</button>
+                  )}
+                </div>
+                <div className="px-4 py-2 text-xs text-slate-500 text-center border-t border-slate-100 bg-white">
+                  {photos[lightboxIdx].caption || `รูปที่ ${lightboxIdx + 1} / ${photos.length}`}
+                  <button onClick={() => setLightboxIdx(null)} className="ml-3 text-[#0071e3] font-semibold hover:underline">← กลับดูทั้งหมด</button>
+                </div>
+              </div>
+            ) : (
+              /* Thumbnail grid */
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {photos.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setLightboxIdx(i)}
+                      className="relative aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-[#0071e3] transition group focus:outline-none"
+                    >
+                      <img
+                        src={p.url}
+                        alt={p.caption || `รูปที่ ${i + 1}`}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                      />
+                      <span className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition" />
+                      <span className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] rounded px-1">{i + 1}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto max-w-full border border-slate-200 rounded-2xl shadow-sm bg-white">
         <table className="w-full text-xs sm:text-sm min-w-[760px]">
           <thead>

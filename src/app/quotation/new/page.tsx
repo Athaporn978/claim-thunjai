@@ -909,6 +909,7 @@ function Wizard() {
             vehicleCategory={form.vehicleCategory || "sedan_asia"}
             vehicleSize={form.vehicleSize || "B"}
             lang={lang}
+            photos={form.photos || []}
           />
         )}
 
@@ -923,6 +924,7 @@ function Wizard() {
               vehicleCategory={form.vehicleCategory || "sedan_asia"}
               vehicleSize={form.vehicleSize || "B"}
               lang={lang}
+              photos={form.photos || []}
             />
             {/* Grand summary with Baht-only Discount Card, Officer Saving KPI & VAT 7% Toggle */}
             {(() => {
