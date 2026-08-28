@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/LangContext";
 import { fmtBaht } from "@/lib/quotation";
+import * as XLSX from "xlsx";
 
 type Row = {
   id: string;
@@ -112,8 +113,7 @@ export default function QuotationsPage() {
         (r.licensePlate && r.licensePlate.toLowerCase().includes(q)) ||
         (r.insurerName && r.insurerName.toLowerCase().includes(q));
 
-      const itemDateStr = r.updatedAt || r.createdAt;
-      const itemDate = itemDateStr ? new Date(itemDateStr) : null;
+      const itemDate = r.createdAt ? new Date(r.createdAt) : null;
       const matchStart = !startDate || !itemDate || itemDate >= new Date(startDate + "T00:00:00");
       const matchEnd = !endDate || !itemDate || itemDate <= new Date(endDate + "T23:59:59");
 
@@ -242,6 +242,46 @@ export default function QuotationsPage() {
 
   const totalSaving = filteredRows.reduce((s, r) => s + r.totalSaving, 0);
 
+  const handleExportExcel = () => {
+    const statusLabel = (s: string) => {
+      if (s === "approved" || s === "finalized") return "อนุมัติแล้ว";
+      if (s === "pending_approval") return "รออนุมัติ";
+      if (s === "pending_review") return "รอตรวจสอบ";
+      if (s === "rejected") return "ตีกลับ";
+      return "บันทึกร่าง";
+    };
+    const fmt2 = (n: number) => Number(n.toFixed(2));
+    const data = filteredRows.map((r, i) => ({
+      "#": i + 1,
+      "เลขที่ใบเสนอราคา": r.quotationNo,
+      "ชื่อลูกค้า": r.customerName || "",
+      "ทะเบียน": r.licensePlate || "",
+      "ยี่ห้อรถ": r.vehicleBrand || "",
+      "ประกันภัย": r.insurerName || "",
+      "เลขเคลม": r.claimNo || "",
+      "สาขา": r.branchName || r.branch?.name || "",
+      "ผู้ทำรายการ": r.createdByName || "",
+      "ราคาเสนอ (บาท)": fmt2(r.totalQuoted),
+      "ราคาหลังควบคุม (บาท)": fmt2(r.totalControlled),
+      "ประหยัดได้ (บาท)": fmt2(r.totalSaving),
+      "สถานะ": statusLabel(r.status),
+      "วันที่สร้าง": r.createdAt ? new Date(r.createdAt).toLocaleDateString("th-TH") : "",
+      "อัปเดตล่าสุด": r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("th-TH") : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    // Column widths
+    ws["!cols"] = [
+      { wch: 4 }, { wch: 18 }, { wch: 20 }, { wch: 12 }, { wch: 14 },
+      { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 },
+      { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ใบเสนอราคา");
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `quotations-export-${date}.xlsx`);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
@@ -254,9 +294,18 @@ export default function QuotationsPage() {
             {lang === "th" ? "ค้นหาและจัดการรายการใบเสนอราคาซ่อมรถยนต์พร้อมสรุปยอดประหยัด" : "Search & manage repair quotations"}
           </p>
         </div>
-        <Link href="/quotation/new" className="btn-primary text-sm !py-2.5 !px-6 shadow-md shadow-blue-500/20">
-          + {lang === "th" ? "สร้างใบใหม่" : "New Quotation"}
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-emerald-500 text-emerald-700 bg-emerald-50 hover:bg-emerald-500 hover:text-white text-sm font-bold transition shadow-sm"
+            title={`Export ${filteredRows.length} รายการที่กรองอยู่`}
+          >
+            📥 Export Excel
+          </button>
+          <Link href="/quotation/new" className="btn-primary text-sm !py-2.5 !px-6 shadow-md shadow-blue-500/20">
+            + {lang === "th" ? "สร้างใบใหม่" : "New Quotation"}
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filter Controls Card */}
