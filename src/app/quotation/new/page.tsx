@@ -136,6 +136,7 @@ function Wizard() {
   const [pendingReuploadData, setPendingReuploadData] = useState<{ extractedItems: QuotationItemInput[]; meta: any } | null>(null);
   const [uploadedFileSignatures, setUploadedFileSignatures] = useState<string[]>([]);
   const [prefillNote, setPrefillNote] = useState<string>("");
+  const [saveToast, setSaveToast] = useState<{ msg: string } | null>(null);
   const skipGuard = useRef(false);
 
   const resetWizardForm = useCallback(() => {
@@ -285,12 +286,17 @@ function Wizard() {
         setId(savedId);
         setDirty(false);
         if (opts?.thenView) {
-          skipGuard.current = true;
-          router.push(`/quotations/${savedId}`);
+          setSaveToast({ msg: lang === "th" ? "✅ บันทึกเรียบร้อยแล้ว! กำลังเปิดรายงาน…" : "✅ Saved! Opening report…" });
+          setTimeout(() => {
+            skipGuard.current = true;
+            router.push(`/quotations/${savedId}`);
+          }, 900);
         } else {
           if (!id) {
             window.history.replaceState(null, "", `/quotation/new?id=${savedId}`);
           }
+          setSaveToast({ msg: lang === "th" ? "✅ บันทึกร่างเรียบร้อยแล้ว!" : "✅ Draft saved!" });
+          setTimeout(() => setSaveToast(null), 2500);
           setPrefillNote(
             lang === "th"
               ? "📝 บันทึกร่างเรียบร้อยแล้ว! (ข้อมูลบันทึกแล้ว สามารถสลับไปทำเคสอื่นหรือออกจากหน้าได้ทันทีโดยไม่ติด Guard)"
@@ -607,6 +613,12 @@ function Wizard() {
 
   return (
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6">
+      {/* Save toast */}
+      {saveToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl bg-emerald-600 text-white text-sm font-bold animate-fade-in pointer-events-none">
+          {saveToast.msg}
+        </div>
+      )}
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>

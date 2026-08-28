@@ -302,6 +302,14 @@ html, body {
   }
 }
 
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeInDown 0.25s ease-out forwards;
+}
+
 /* Damage report → PDF: isolate only #print-area (scoped so it doesn't affect
    other printable pages like the quotation report). */
 @media print {
