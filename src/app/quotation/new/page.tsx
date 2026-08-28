@@ -615,7 +615,7 @@ function Wizard() {
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6">
       {/* Save toast */}
       {saveToast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl bg-emerald-600 text-white text-sm font-bold animate-fade-in pointer-events-none">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl bg-emerald-600 text-white text-sm font-bold animate-toast-in pointer-events-none">
           {saveToast.msg}
         </div>
       )}
