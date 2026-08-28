@@ -260,6 +260,7 @@ function Wizard() {
       const userName = sessionUser?.name || sessionUser?.fullName || (userEmail.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี");
       const userBranch = sessionUser?.branchName || sessionUser?.branch || (userEmail.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)");
 
+      const userRole = sessionUser?.roleName || sessionUser?.role?.name || "เจ้าหน้าที่คุมราคา";
       const payload: any = {
         ...form,
         createdByName: userName,
@@ -269,6 +270,9 @@ function Wizard() {
         // Only meaningful on the first save (POST) of an AI-scanned case; the
         // server ignores it otherwise.
         usageLogId: scanUsageLogId.current,
+        // For EDITED audit log on PUT
+        _editorName: userName,
+        _editorRole: userRole,
       };
       const res = await fetch(id ? `/api/quotations/${id}` : "/api/quotations", {
         method: id ? "PUT" : "POST",

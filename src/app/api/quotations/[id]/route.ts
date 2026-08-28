@@ -20,8 +20,14 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function PUT(req: NextRequest, { params }: Ctx) {
   try {
     const { id } = await params;
-    const body = (await req.json()) as QuotationInput;
+    const body = (await req.json()) as QuotationInput & { _editorName?: string; _editorRole?: string };
     const t = totals(body.items || []);
+
+    // Snapshot before for change summary
+    const before = await prisma.quotation.findUnique({
+      where: { id },
+      select: { totalQuoted: true, totalControlled: true, totalSaving: true, customerName: true, licensePlate: true },
+    });
 
     // Replace items wholesale (simplest reliable upsert for a small list)
     await prisma.quotationItem.deleteMany({ where: { quotationId: id } });
@@ -83,6 +89,31 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         },
       },
       include: { items: true },
+    });
+
+    // Build a human-readable change summary
+    const changes: string[] = [];
+    if (before) {
+      const fmt = (n: number) => n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (Math.abs((before.totalQuoted ?? 0) - t.totalQuoted) > 0.01)
+        changes.push(`ราคาเสนอรวม: ${fmt(before.totalQuoted ?? 0)} → ${fmt(t.totalQuoted)} บาท`);
+      if (Math.abs((before.totalControlled ?? 0) - t.totalControlled) > 0.01)
+        changes.push(`ราคาควบคุม: ${fmt(before.totalControlled ?? 0)} → ${fmt(t.totalControlled)} บาท`);
+      if ((before.customerName ?? "") !== (body.customerName ?? ""))
+        changes.push(`ชื่อลูกค้า: "${before.customerName ?? "-"}" → "${body.customerName ?? "-"}"`);
+      if ((before.licensePlate ?? "") !== (body.licensePlate ?? ""))
+        changes.push(`ทะเบียน: ${before.licensePlate ?? "-"} → ${body.licensePlate ?? "-"}`);
+    }
+    changes.push(`รายการซ่อม ${(body.items || []).length} รายการ`);
+
+    await prisma.quotationLog.create({
+      data: {
+        quotationId: id,
+        authorName: body._editorName || "เจ้าหน้าที่",
+        authorRole: body._editorRole || "",
+        action: "EDITED",
+        comment: changes.join(" | "),
+      },
     });
 
     return NextResponse.json({ quotation: updated });

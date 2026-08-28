@@ -167,7 +167,7 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
     return { score, rate, label };
   }, [q]);
 
-  const loadData = () => {
+  const loadData = (logView = false) => {
     setLoading(true);
     Promise.all([
       fetch(`/api/quotations/${id}`).then((r) => r.json()),
@@ -176,12 +176,26 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
       .then(([qRes, logRes]) => {
         setQ(qRes.quotation || null);
         setLogs(logRes.logs || []);
+        if (logView) {
+          // Fire-and-forget: record who viewed this quotation
+          try {
+            const raw = localStorage.getItem("claim_user_session");
+            const u = raw ? JSON.parse(raw) : null;
+            const name = u?.name || u?.fullName || "ผู้ใช้งาน";
+            const role = u?.roleName || u?.role?.name || "";
+            fetch(`/api/quotations/${id}/log-view`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ authorName: name, authorRole: role }),
+            }).catch(() => {});
+          } catch {}
+        }
       })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [id]);
 
   const handleStaffSubmit = async () => {
@@ -799,18 +813,43 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
               {logs.map((log) => (
                 <div key={log.id} className="relative group">
                   <span className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ${
-                    log.action === "APPROVED"
-                      ? "bg-emerald-500 shadow-xs"
-                      : log.action === "REJECTED"
-                      ? "bg-rose-500 shadow-xs"
-                      : "bg-blue-500"
+                    log.action === "APPROVED"  ? "bg-emerald-500 shadow-xs"
+                    : log.action === "REJECTED" ? "bg-rose-500 shadow-xs"
+                    : log.action === "VIEW"     ? "bg-slate-400"
+                    : log.action === "EDITED"   ? "bg-amber-400"
+                    : "bg-blue-500"
                   }`}></span>
 
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+                  <div className={`border rounded-xl p-3 text-xs space-y-1 ${
+                    log.action === "VIEW"   ? "bg-slate-50/60 border-slate-200"
+                    : log.action === "EDITED" ? "bg-amber-50/60 border-amber-200"
+                    : "bg-slate-50 border-slate-200"
+                  }`}>
                     <div className="flex items-center justify-between font-sans">
                       <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>{log.action === "APPROVED" ? "✅" : log.action === "REJECTED" ? "❌" : "📝"}</span>
-                        <span>{log.authorName} ({log.authorRole || "ผู้ใช้งาน"})</span>
+                        <span>
+                          {log.action === "APPROVED" ? "✅"
+                          : log.action === "REJECTED" ? "❌"
+                          : log.action === "VIEW"     ? "👁️"
+                          : log.action === "EDITED"   ? "✏️"
+                          : "📝"}
+                        </span>
+                        <span>{log.authorName}{log.authorRole ? ` (${log.authorRole})` : ""}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                          log.action === "APPROVED" ? "bg-emerald-100 text-emerald-700"
+                          : log.action === "REJECTED" ? "bg-rose-100 text-rose-700"
+                          : log.action === "VIEW"   ? "bg-slate-100 text-slate-500"
+                          : log.action === "EDITED" ? "bg-amber-100 text-amber-700"
+                          : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {log.action === "APPROVED" ? "อนุมัติ"
+                          : log.action === "REJECTED" ? "ตีกลับ"
+                          : log.action === "SUBMITTED" ? "ส่งอนุมัติ"
+                          : log.action === "CREATED" ? "สร้างเคส"
+                          : log.action === "VIEW"   ? "เปิดดู"
+                          : log.action === "EDITED" ? "แก้ไข"
+                          : log.action}
+                        </span>
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">
                         {new Date(log.createdAt).toLocaleString("th-TH")}
@@ -818,7 +857,11 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
                     </div>
 
                     {log.comment && (
-                      <p className={`font-sans pt-1 font-medium ${log.action === "REJECTED" ? "text-rose-700 font-bold" : "text-slate-600"}`}>
+                      <p className={`font-sans pt-1 font-medium ${
+                        log.action === "REJECTED" ? "text-rose-700 font-bold"
+                        : log.action === "EDITED" ? "text-amber-700"
+                        : "text-slate-600"
+                      }`}>
                         {log.comment}
                       </p>
                     )}
