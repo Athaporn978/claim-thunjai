@@ -86,7 +86,9 @@ export function ItemsTable({
   const [pickerRow, setPickerRow] = useState<number | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const rows = items.filter((i) => i.type === type);
+  const hasAnyNote = rows.some((r) => r.note && r.note.trim());
 
   useEffect(() => {
     if (!photoOpen) return;
@@ -129,7 +131,7 @@ export function ItemsTable({
     onChange(next);
   };
 
-  const inputCls = "w-full min-w-[65px] px-1.5 py-1 text-xs sm:text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-[#0071e3]";
+  const inputCls = "w-full px-1.5 py-1 text-xs sm:text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-[#0071e3]";
   const qtyInputCls = "w-12 px-1 py-1 text-xs text-center border border-slate-200 rounded focus:outline-none focus:border-[#0071e3] font-mono font-semibold";
 
   return (
@@ -255,27 +257,40 @@ export function ItemsTable({
               <th rowSpan={2} className="px-3 py-3 text-center align-middle font-extrabold border-r border-white/10 bg-gradient-to-b from-orange-500 to-orange-600 min-w-[90px]">
                 {lang === "th" ? "ส่วนต่าง (Saving)" : "Saving"}
               </th>
-              <th rowSpan={2} className="px-3.5 py-3 text-center align-middle font-extrabold bg-[#0b132a] min-w-[140px]">
-                {lang === "th" ? "หมายเหตุ" : "Note"}
-              </th>
+              {noteOpen ? (
+                <th rowSpan={2} className="px-3.5 py-3 text-center align-middle font-extrabold bg-[#0b132a] min-w-[140px]">
+                  <button onClick={() => setNoteOpen(false)} title="ซ่อนคอลัมน์หมายเหตุ"
+                    className="inline-flex items-center gap-1 text-slate-300 hover:text-white text-xs font-bold transition">
+                    {lang === "th" ? "หมายเหตุ" : "Note"} <span className="text-slate-400">◂</span>
+                  </button>
+                </th>
+              ) : (
+                <th rowSpan={2} className="px-2 py-3 text-center align-middle bg-[#0b132a] w-10">
+                  <button onClick={() => setNoteOpen(true)} title={lang === "th" ? "แสดงคอลัมน์หมายเหตุ" : "Show note column"}
+                    className="relative inline-flex items-center justify-center w-7 h-7 rounded-full hover:bg-white/10 transition text-base">
+                    📝
+                    {hasAnyNote && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full border border-[#0b132a]" />}
+                  </button>
+                </th>
+              )}
               <th rowSpan={2} className="px-2 py-2 w-8 bg-[#0b132a]"></th>
             </tr>
             <tr className="text-[11px] font-bold">
               {/* Pre-Control Subheaders */}
-              <th className="px-2 py-1.5 text-center align-middle bg-slate-200/90 text-slate-700 min-w-[85px] border-r border-slate-300/60">{lang === "th" ? "ต่อหน่วย" : "Unit"}</th>
+              <th className="px-2 py-1.5 text-center align-middle bg-slate-200/90 text-slate-700 w-28 border-r border-slate-300/60">{lang === "th" ? "ต่อหน่วย" : "Unit"}</th>
               <th className="px-1 py-1.5 text-center align-middle bg-slate-200/90 text-slate-700 w-12 border-r border-slate-300/60">{lang === "th" ? "จำนวน" : "Qty"}</th>
-              <th className="px-2 py-1.5 text-center align-middle bg-slate-200/90 text-slate-800 border-r-4 border-slate-400/50 min-w-[80px]">{lang === "th" ? "รวม" : "Total"}</th>
+              <th className="px-2 py-1.5 text-center align-middle bg-slate-200/90 text-slate-800 border-r-4 border-slate-400/50 w-24">{lang === "th" ? "รวม" : "Total"}</th>
               {/* Post-Control Subheaders */}
-              <th className="px-2 py-1.5 text-center align-middle bg-[#dbeafe] text-[#0071e3] min-w-[85px] border-r border-sky-300">{lang === "th" ? "ต่อหน่วย" : "Unit"}</th>
+              <th className="px-2 py-1.5 text-center align-middle bg-[#dbeafe] text-[#0071e3] w-28 border-r border-sky-300">{lang === "th" ? "ต่อหน่วย" : "Unit"}</th>
               <th className="px-1 py-1.5 text-center align-middle bg-[#dbeafe] text-[#0071e3] w-12 border-r border-sky-300">{lang === "th" ? "จำนวน" : "Qty"}</th>
-              <th className="px-2 py-1.5 text-center align-middle bg-[#dbeafe] text-[#0071e3] border-r-4 border-[#005bb5]/30 min-w-[80px]">{lang === "th" ? "รวม" : "Total"}</th>
+              <th className="px-2 py-1.5 text-center align-middle bg-[#dbeafe] text-[#0071e3] border-r-4 border-[#005bb5]/30 w-24">{lang === "th" ? "รวม" : "Total"}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center text-slate-400 py-6 font-semibold">
-                  {lang === "th" ? "ยังไม่มีรายการ — กดเพิ่มรายการด้านล่าง" : "No items — add a row below"}
+                <td colSpan={noteOpen ? 10 : 9} className="text-center text-slate-400 py-6 font-semibold">
+                  {lang === "th" ? "ยังไม่มีรายการ — กดเพิ่มรายการด้านบน" : "No items — add a row above"}
                 </td>
               </tr>
             ) : (
@@ -370,15 +385,17 @@ export function ItemsTable({
                     <td className={`px-2 py-2.5 text-right font-extrabold border-r border-slate-100 whitespace-nowrap font-mono ${sav > 0 ? "text-orange-600 bg-orange-50/40" : "text-slate-400"}`}>
                       {fmtBaht(sav, lang)}
                     </td>
-                    {/* Note */}
-                    <td className="px-2 py-2.5">
-                      <input
-                        value={r.note || ""}
-                        onChange={(e) => updateRow(idx, { note: e.target.value })}
-                        placeholder={lang === "th" ? "เหตุผลที่ปรับ…" : "Reason…"}
-                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0071e3]"
-                      />
-                    </td>
+                    {/* Note — hidden when noteOpen=false */}
+                    {noteOpen && (
+                      <td className="px-2 py-2.5">
+                        <input
+                          value={r.note || ""}
+                          onChange={(e) => updateRow(idx, { note: e.target.value })}
+                          placeholder={lang === "th" ? "เหตุผลที่ปรับ…" : "Reason…"}
+                          className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#0071e3]"
+                        />
+                      </td>
+                    )}
                     <td className="px-2 py-2.5 text-center">
                       <button onClick={() => removeRow(idx)} className="w-7 h-7 rounded-full text-slate-400 hover:bg-red-50 hover:text-red-500 transition" title="ลบ">✕</button>
                     </td>
@@ -395,11 +412,15 @@ export function ItemsTable({
               <td colSpan={2} className="bg-sky-100/40"></td>
               <td className="px-2 py-2.5 text-right text-[#0071e3] border-r-4 border-[#005bb5]/30 whitespace-nowrap font-mono bg-sky-200/70">{fmtBaht(st.totalControlled, lang)}</td>
               <td className="px-2 py-2.5 text-right text-orange-600 border-r border-slate-200 whitespace-nowrap font-mono bg-orange-100/50">{fmtBaht(st.totalSaving, lang)}</td>
-              <td colSpan={2}></td>
+              <td colSpan={noteOpen ? 2 : 1}></td>
             </tr>
           </tfoot>
         </table>
       </div>
+
+      <button onClick={addRow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-600 hover:border-[var(--orange-500)] hover:text-[var(--orange-600)] transition">
+        + {lang === "th" ? "เพิ่มรายการ" : "Add Item"}
+      </button>
 
       {/* AI Explained Reasoning Panel for Labor & Parts Steps */}
       <div className="mt-4 bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-2 text-xs shadow-2xs">
@@ -441,10 +462,6 @@ export function ItemsTable({
           )}
         </div>
       </div>
-
-      <button onClick={addRow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-600 hover:border-[var(--orange-500)] hover:text-[var(--orange-600)] transition">
-        + {lang === "th" ? "เพิ่มรายการ" : "Add Item"}
-      </button>
 
       <StandardPricePicker
         open={pickerRow !== null}
