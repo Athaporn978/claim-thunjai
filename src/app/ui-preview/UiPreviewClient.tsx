@@ -89,20 +89,49 @@ type ThemeKey =
   | "namWai" | "saraBua" | "siladonKhem"
   | "faMon" | "khonNakYung" | "kram" | "namNgoen" | "namNgoenNok";
 
-const THEMES: Record<ThemeKey, { label: string; sidebarBg: string; border: string; primary: string; light?: true }> = {
-  vivid:         { label: "🎨 ตรีมสีสัน (Mockup)",    sidebarBg: "",        border: "",        primary: "#e91e63" },
-  navy:          { label: "🏢 Navy — H Tech",          sidebarBg: "#0b132a", border: "#152243", primary: "#0071e3" },
-  tealDeep:      { label: "A — Teal เข้ม",            sidebarBg: "#0d3d38", border: "#1a5248", primary: "#0d9488" },
-  tealCyan:      { label: "B — Teal-Cyan สดใส",       sidebarBg: "#0e5c6e", border: "#1a7a8f", primary: "#0891b2" },
-  tealSlate:     { label: "C — Teal-Slate นุ่ม",      sidebarBg: "#134e4a", border: "#1c6b64", primary: "#0f766e" },
-  namWai:        { label: "น้ำไหล",                   sidebarBg: "#c1e8e0", border: "#a8d8d0", primary: "#2a9d8f", light: true },
-  saraBua:       { label: "สระบัว",                   sidebarBg: "#8fb4af", border: "#7aa09b", primary: "#3d7a78", light: true },
-  siladonKhem:   { label: "ศิลาดลเข้ม",              sidebarBg: "#3d7a78", border: "#2e6260", primary: "#5ba3a0" },
-  faMon:         { label: "ฟ้าหม่น",                 sidebarBg: "#2d3f5a", border: "#1f2e45", primary: "#5b80b0" },
-  khonNakYung:   { label: "ขนคอนางนกยูง",             sidebarBg: "#1e7d96", border: "#15637a", primary: "#38b6d0" },
-  kram:          { label: "คราม",                     sidebarBg: "#1e2d6b", border: "#172254", primary: "#4a6fd4" },
-  namNgoen:      { label: "น้ำเงินเจ้าฟ้า",           sidebarBg: "#2855c8", border: "#1e44a8", primary: "#7099e8" },
-  namNgoenNok:   { label: "น้ำเงินนกพิราบ",           sidebarBg: "#2a3e5e", border: "#1e2e4a", primary: "#5070a0" },
+type ThemeDef = { label: string; sidebarBg: string; border: string; primary: string; light?: true;
+  cards: [string,string,string,string]; donuts: [string,string,string] };
+
+const THEMES: Record<ThemeKey, ThemeDef> = {
+  vivid:       { label:"🎨 ตรีมสีสัน (Mockup)", sidebarBg:"",        border:"",        primary:"#e91e63",
+    cards:["linear-gradient(135deg,#ff416c,#ff4b2b)","linear-gradient(135deg,#8e2de2,#4a00e0)","linear-gradient(135deg,#00c6ff,#0072ff)","linear-gradient(135deg,#f7971e,#ffd200)"],
+    donuts:["#8e2de2","#e91e63","#f7971e"] },
+  navy:        { label:"🏢 Navy — H Tech",        sidebarBg:"#0b132a", border:"#152243", primary:"#0071e3",
+    cards:["linear-gradient(135deg,#0071e3,#1d4ed8)","linear-gradient(135deg,#1e40af,#3730a3)","linear-gradient(135deg,#0284c7,#0369a1)","linear-gradient(135deg,#0f172a,#1e3a5f)"],
+    donuts:["#2563eb","#38bdf8","#0ea5e9"] },
+  tealDeep:    { label:"A — Teal เข้ม",          sidebarBg:"#0d3d38", border:"#1a5248", primary:"#0d9488",
+    cards:["linear-gradient(135deg,#0d9488,#065f46)","linear-gradient(135deg,#0f766e,#134e4a)","linear-gradient(135deg,#14b8a6,#0d9488)","linear-gradient(135deg,#134e4a,#022c22)"],
+    donuts:["#0d9488","#34d399","#6ee7b7"] },
+  tealCyan:    { label:"B — Teal-Cyan สดใส",     sidebarBg:"#0e5c6e", border:"#1a7a8f", primary:"#0891b2",
+    cards:["linear-gradient(135deg,#0891b2,#0e4f64)","linear-gradient(135deg,#0e7490,#164e63)","linear-gradient(135deg,#22d3ee,#0891b2)","linear-gradient(135deg,#0e5c6e,#042d36)"],
+    donuts:["#0891b2","#22d3ee","#67e8f9"] },
+  tealSlate:   { label:"C — Teal-Slate นุ่ม",    sidebarBg:"#134e4a", border:"#1c6b64", primary:"#0f766e",
+    cards:["linear-gradient(135deg,#0f766e,#134e4a)","linear-gradient(135deg,#115e59,#0d3d38)","linear-gradient(135deg,#2dd4bf,#0f766e)","linear-gradient(135deg,#042f2e,#011513)"],
+    donuts:["#0f766e","#2dd4bf","#5eead4"] },
+  namWai:      { label:"น้ำไหล",                 sidebarBg:"#c1e8e0", border:"#a8d8d0", primary:"#2a9d8f", light:true,
+    cards:["linear-gradient(135deg,#2a9d8f,#1a6b60)","linear-gradient(135deg,#219186,#166158)","linear-gradient(135deg,#4dd0c4,#2a9d8f)","linear-gradient(135deg,#1a5c55,#0a2926)"],
+    donuts:["#2a9d8f","#4dd0c4","#99f6e4"] },
+  saraBua:     { label:"สระบัว",                 sidebarBg:"#8fb4af", border:"#7aa09b", primary:"#3d7a78", light:true,
+    cards:["linear-gradient(135deg,#3d7a78,#2a5655)","linear-gradient(135deg,#336665,#234848)","linear-gradient(135deg,#5ba3a0,#3d7a78)","linear-gradient(135deg,#2a5655,#132828)"],
+    donuts:["#3d7a78","#5ba3a0","#9dd4d1"] },
+  siladonKhem: { label:"ศิลาดลเข้ม",            sidebarBg:"#3d7a78", border:"#2e6260", primary:"#5ba3a0",
+    cards:["linear-gradient(135deg,#3d7a78,#2a5655)","linear-gradient(135deg,#2e6260,#1d4140)","linear-gradient(135deg,#5ba3a0,#3d7a78)","linear-gradient(135deg,#1d4140,#0a1e1e)"],
+    donuts:["#5ba3a0","#8ecfcc","#b2e4e1"] },
+  faMon:       { label:"ฟ้าหม่น",               sidebarBg:"#2d3f5a", border:"#1f2e45", primary:"#5b80b0",
+    cards:["linear-gradient(135deg,#2d3f5a,#1a2840)","linear-gradient(135deg,#374a6b,#243250)","linear-gradient(135deg,#5b80b0,#2d3f5a)","linear-gradient(135deg,#1a2840,#0a1220)"],
+    donuts:["#5b80b0","#88aacc","#b4ccee"] },
+  khonNakYung: { label:"ขนคอนางนกยูง",           sidebarBg:"#1e7d96", border:"#15637a", primary:"#38b6d0",
+    cards:["linear-gradient(135deg,#1e7d96,#135868)","linear-gradient(135deg,#1a6b80,#0e4756)","linear-gradient(135deg,#38b6d0,#1e7d96)","linear-gradient(135deg,#0e4756,#061c23)"],
+    donuts:["#1e7d96","#38b6d0","#7dd8ea"] },
+  kram:        { label:"คราม",                   sidebarBg:"#1e2d6b", border:"#172254", primary:"#4a6fd4",
+    cards:["linear-gradient(135deg,#1e2d6b,#141d48)","linear-gradient(135deg,#2435a0,#182578)","linear-gradient(135deg,#4a6fd4,#1e2d6b)","linear-gradient(135deg,#141d48,#080e26)"],
+    donuts:["#4a6fd4","#7b9de8","#a8bff0"] },
+  namNgoen:    { label:"น้ำเงินเจ้าฟ้า",         sidebarBg:"#2855c8", border:"#1e44a8", primary:"#7099e8",
+    cards:["linear-gradient(135deg,#2855c8,#1a3a9c)","linear-gradient(135deg,#3365d8,#2050c0)","linear-gradient(135deg,#7099e8,#2855c8)","linear-gradient(135deg,#1a3a9c,#0a1d52)"],
+    donuts:["#2855c8","#7099e8","#a8bff0"] },
+  namNgoenNok: { label:"น้ำเงินนกพิราบ",         sidebarBg:"#2a3e5e", border:"#1e2e4a", primary:"#5070a0",
+    cards:["linear-gradient(135deg,#2a3e5e,#1a2840)","linear-gradient(135deg,#334a70,#213058)","linear-gradient(135deg,#5070a0,#2a3e5e)","linear-gradient(135deg,#1a2840,#0a1420)"],
+    donuts:["#5070a0","#7a98c8","#a4bae0"] },
 };
 
 const baht = (n: number) =>
@@ -157,32 +186,24 @@ export function UiPreviewClient() {
 
   // ── Theme tokens ─────────────────────────────────────────────────
   const pri = currentTheme.primary;
+  const ct = currentTheme;
   const T = {
-    // Chart line colours
     line1: isVivid ? "#e91e63" : pri,
-    line2: isVivid ? "#00c6ff" : "#38bdf8",
-    // KPI gradient cards
-    card1bg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)"  : `linear-gradient(135deg,${pri},#1d4ed8)`,
-    card2bg: isVivid ? "linear-gradient(135deg,#8e2de2,#4a00e0)"  : "linear-gradient(135deg,#1e40af,#3730a3)",
-    card3bg: isVivid ? "linear-gradient(135deg,#00c6ff,#0072ff)"  : "linear-gradient(135deg,#0284c7,#0369a1)",
-    card4bg: isVivid ? "linear-gradient(135deg,#f7971e,#ffd200)"  : "linear-gradient(135deg,#0f172a,#1e3a5f)",
-    // Donut
-    donut1: isVivid ? "#8e2de2" : pri,
-    donut2: isVivid ? "#e91e63" : "#38bdf8",
-    donut3: isVivid ? "#f7971e" : "#0ea5e9",
-    // Active tab underline / btn accent
+    line2: isVivid ? "#00c6ff" : ct.donuts[1],
+    card1bg: ct.cards[0],
+    card2bg: ct.cards[1],
+    card3bg: ct.cards[2],
+    card4bg: ct.cards[3],
+    donut1: ct.donuts[0],
+    donut2: ct.donuts[1],
+    donut3: ct.donuts[2],
     accent: isVivid ? "#e91e63" : pri,
-    // Summary button
-    summaryBg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)" : `linear-gradient(135deg,${pri},#1d4ed8)`,
-    summaryBgShadow: isVivid ? "rgba(255,65,108,0.3)" : "rgba(0,113,227,0.3)",
-    // Add case button
-    addBg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)" : `linear-gradient(135deg,${pri},#1d4ed8)`,
-    // Brand name gradient
-    brandGrad: isVivid ? "linear-gradient(135deg,#e91e63,#0071e3)" : `linear-gradient(135deg,${pri},#38bdf8)`,
-    // dot colours in legend
-    dotSaving:  isVivid ? "#00c6ff" : "#38bdf8",
+    summaryBg: ct.cards[0],
+    summaryBgShadow: isVivid ? "rgba(255,65,108,0.3)" : "rgba(0,0,0,0.25)",
+    addBg: ct.cards[0],
+    brandGrad: isVivid ? "linear-gradient(135deg,#e91e63,#0071e3)" : `linear-gradient(135deg,${pri},${ct.donuts[1]})`,
+    dotSaving:  isVivid ? "#00c6ff" : ct.donuts[1],
     dotQuoted:  isVivid ? "#ff416c" : pri,
-    // Page num active
     pageActive: isVivid ? "#e91e63" : pri,
   };
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({ 0:true,1:true,2:true,3:true,4:true });
@@ -282,11 +303,11 @@ export function UiPreviewClient() {
       </svg>
 
       {/* ── TOP NAVBAR ─────────────────────────────────────────────── */}
-      <header className="top-navbar">
+      <header className="top-navbar" style={dark && !isLightSidebar ? {background:ct.sidebarBg, borderBottom:`1px solid ${ct.border}`, boxShadow:"none", color:"#fff"} : {}}>
         <div className="navbar-left">
           <a href="/ui-preview" className="brand-logo" style={{ textDecoration: "none" }}>
             <img src="/logo/Htech_logo.webp" alt="H Technology" className="logo-img" />
-            <span className="brand-name">H Technology</span>
+            <span className="brand-name" style={dark && !isLightSidebar ? {color:"#fff"} : {}}>H Technology</span>
           </a>
           <button className="menu-toggle-btn" onClick={() => setNavOpen((v) => !v)} aria-label="toggle sidebar">
             <span style={{ display: "inline-flex", width: 18, height: 18 }}>{IC.bars}</span>
