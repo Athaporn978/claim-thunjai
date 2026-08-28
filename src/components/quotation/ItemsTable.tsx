@@ -87,6 +87,18 @@ export function ItemsTable({
   const [photoOpen, setPhotoOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const rows = items.filter((i) => i.type === type);
+
+  useEffect(() => {
+    if (!photoOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (lightboxIdx !== null) setLightboxIdx(null);
+        else { setPhotoOpen(false); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [photoOpen, lightboxIdx]);
   const st = sectionTotals(items, type);
 
   const updateRow = (rowIdx: number, patch: Partial<QuotationItemInput>) => {
