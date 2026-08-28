@@ -82,6 +82,29 @@ const PURPLE = "#8e2de2";
 const ORANGE = "#f7971e";
 const BLUE   = "#0071e3";
 
+// ── Theme catalogue ───────────────────────────────────────────────
+type ThemeKey =
+  | "vivid" | "navy"
+  | "tealDeep" | "tealCyan" | "tealSlate"
+  | "namWai" | "saraBua" | "siladonKhem"
+  | "faMon" | "khonNakYung" | "kram" | "namNgoen" | "namNgoenNok";
+
+const THEMES: Record<ThemeKey, { label: string; sidebarBg: string; border: string; primary: string; light?: true }> = {
+  vivid:         { label: "🎨 ตรีมสีสัน (Mockup)",    sidebarBg: "",        border: "",        primary: "#e91e63" },
+  navy:          { label: "🏢 Navy — H Tech",          sidebarBg: "#0b132a", border: "#152243", primary: "#0071e3" },
+  tealDeep:      { label: "A — Teal เข้ม",            sidebarBg: "#0d3d38", border: "#1a5248", primary: "#0d9488" },
+  tealCyan:      { label: "B — Teal-Cyan สดใส",       sidebarBg: "#0e5c6e", border: "#1a7a8f", primary: "#0891b2" },
+  tealSlate:     { label: "C — Teal-Slate นุ่ม",      sidebarBg: "#134e4a", border: "#1c6b64", primary: "#0f766e" },
+  namWai:        { label: "น้ำไหล",                   sidebarBg: "#c1e8e0", border: "#a8d8d0", primary: "#2a9d8f", light: true },
+  saraBua:       { label: "สระบัว",                   sidebarBg: "#8fb4af", border: "#7aa09b", primary: "#3d7a78", light: true },
+  siladonKhem:   { label: "ศิลาดลเข้ม",              sidebarBg: "#3d7a78", border: "#2e6260", primary: "#5ba3a0" },
+  faMon:         { label: "ฟ้าหม่น",                 sidebarBg: "#2d3f5a", border: "#1f2e45", primary: "#5b80b0" },
+  khonNakYung:   { label: "ขนคอนางนกยูง",             sidebarBg: "#1e7d96", border: "#15637a", primary: "#38b6d0" },
+  kram:          { label: "คราม",                     sidebarBg: "#1e2d6b", border: "#172254", primary: "#4a6fd4" },
+  namNgoen:      { label: "น้ำเงินเจ้าฟ้า",           sidebarBg: "#2855c8", border: "#1e44a8", primary: "#7099e8" },
+  namNgoenNok:   { label: "น้ำเงินนกพิราบ",           sidebarBg: "#2a3e5e", border: "#1e2e4a", primary: "#5070a0" },
+};
+
 const baht = (n: number) =>
   "฿" + Math.round(n).toLocaleString("th-TH");
 
@@ -126,37 +149,41 @@ export function UiPreviewClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [navOpen, setNavOpen] = useState(true);
-  const [sidebarTheme, setSidebarTheme] = useState<"light" | "dark">("light");
-  const dark = sidebarTheme === "dark";
+  const [themeKey, setThemeKey] = useState<ThemeKey>("navy");
+  const currentTheme = THEMES[themeKey];
+  const isVivid = themeKey === "vivid";
+  const isLightSidebar = !!currentTheme.light;
+  const dark = !isVivid;
 
   // ── Theme tokens ─────────────────────────────────────────────────
+  const pri = currentTheme.primary;
   const T = {
     // Chart line colours
-    line1: dark ? "#0071e3" : "#e91e63",   // quoted / primary
-    line2: dark ? "#38bdf8" : "#00c6ff",   // saving  / secondary
+    line1: isVivid ? "#e91e63" : pri,
+    line2: isVivid ? "#00c6ff" : "#38bdf8",
     // KPI gradient cards
-    card1bg: dark ? "linear-gradient(135deg,#0071e3,#1d4ed8)"  : "linear-gradient(135deg,#ff416c,#ff4b2b)",
-    card2bg: dark ? "linear-gradient(135deg,#1e40af,#3730a3)"  : "linear-gradient(135deg,#8e2de2,#4a00e0)",
-    card3bg: dark ? "linear-gradient(135deg,#0284c7,#0369a1)"  : "linear-gradient(135deg,#00c6ff,#0072ff)",
-    card4bg: dark ? "linear-gradient(135deg,#0f172a,#1e3a5f)"  : "linear-gradient(135deg,#f7971e,#ffd200)",
+    card1bg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)"  : `linear-gradient(135deg,${pri},#1d4ed8)`,
+    card2bg: isVivid ? "linear-gradient(135deg,#8e2de2,#4a00e0)"  : "linear-gradient(135deg,#1e40af,#3730a3)",
+    card3bg: isVivid ? "linear-gradient(135deg,#00c6ff,#0072ff)"  : "linear-gradient(135deg,#0284c7,#0369a1)",
+    card4bg: isVivid ? "linear-gradient(135deg,#f7971e,#ffd200)"  : "linear-gradient(135deg,#0f172a,#1e3a5f)",
     // Donut
-    donut1: dark ? "#2563eb" : "#8e2de2",
-    donut2: dark ? "#38bdf8" : "#e91e63",
-    donut3: dark ? "#0ea5e9" : "#f7971e",
+    donut1: isVivid ? "#8e2de2" : pri,
+    donut2: isVivid ? "#e91e63" : "#38bdf8",
+    donut3: isVivid ? "#f7971e" : "#0ea5e9",
     // Active tab underline / btn accent
-    accent: dark ? "#0071e3" : "#e91e63",
+    accent: isVivid ? "#e91e63" : pri,
     // Summary button
-    summaryBg: dark ? "linear-gradient(135deg,#0071e3,#1d4ed8)" : "linear-gradient(135deg,#ff416c,#ff4b2b)",
-    summaryBgShadow: dark ? "rgba(0,113,227,0.3)" : "rgba(255,65,108,0.3)",
+    summaryBg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)" : `linear-gradient(135deg,${pri},#1d4ed8)`,
+    summaryBgShadow: isVivid ? "rgba(255,65,108,0.3)" : "rgba(0,113,227,0.3)",
     // Add case button
-    addBg: dark ? "linear-gradient(135deg,#0071e3,#1d4ed8)" : "linear-gradient(135deg,#ff416c,#ff4b2b)",
+    addBg: isVivid ? "linear-gradient(135deg,#ff416c,#ff4b2b)" : `linear-gradient(135deg,${pri},#1d4ed8)`,
     // Brand name gradient
-    brandGrad: dark ? "linear-gradient(135deg,#0071e3,#38bdf8)" : "linear-gradient(135deg,#e91e63,#0071e3)",
+    brandGrad: isVivid ? "linear-gradient(135deg,#e91e63,#0071e3)" : `linear-gradient(135deg,${pri},#38bdf8)`,
     // dot colours in legend
-    dotSaving:  dark ? "#38bdf8" : "#00c6ff",
-    dotQuoted:  dark ? "#0071e3" : "#ff416c",
+    dotSaving:  isVivid ? "#00c6ff" : "#38bdf8",
+    dotQuoted:  isVivid ? "#ff416c" : pri,
     // Page num active
-    pageActive: dark ? "#0071e3" : "#e91e63",
+    pageActive: isVivid ? "#e91e63" : pri,
   };
   const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({ 0:true,1:true,2:true,3:true,4:true });
   const toggleGroup = (i: number) => setOpenGroups((p) => ({ ...p, [i]: !p[i] }));
@@ -268,20 +295,46 @@ export function UiPreviewClient() {
         </div>
 
         <div className="navbar-right">
-          <button
-            onClick={() => setSidebarTheme(dark ? "light" : "dark")}
-            title={dark ? "ตรีมสีสัน (Mockup)" : "ตรีมของ H Tech (ปัจจุบัน)"}
-            style={{
-              display:"flex",alignItems:"center",gap:6,padding:"5px 12px",
-              borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
-              ...(dark
-                ? {background:"#0b132a",color:"#fff",border:"1px solid #152243"}
-                : {background:"#eef6ff",color:"#0056b3",border:"1px solid #cce5ff"}),
-            }}
-          >
-            <span>{dark ? "🎨" : "🏢"}</span>
-            <span>{dark ? "ตรีมสีสัน" : "H Tech"}</span>
-          </button>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <label htmlFor="themeSelect" style={{ fontSize:11, fontWeight:600, color:"#64748b", whiteSpace:"nowrap" }}>Color Theme:</label>
+            <select
+              id="themeSelect"
+              value={themeKey}
+              onChange={(e) => setThemeKey(e.target.value as ThemeKey)}
+              style={{
+                appearance:"none",
+                border:"1.5px solid #d1d5db",
+                borderRadius:20,
+                padding:"4px 28px 4px 10px",
+                fontSize:12,
+                fontWeight:600,
+                background:"#fff url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\") no-repeat right 9px center",
+                color:"#1e293b",
+                cursor:"pointer",
+                minWidth:180,
+              }}
+            >
+              <optgroup label="── ตรีม ──">
+                <option value="vivid">🎨 ตรีมสีสัน (Mockup)</option>
+                <option value="navy">🏢 Navy — H Tech</option>
+              </optgroup>
+              <optgroup label="── Teal ──">
+                <option value="tealDeep">A — Teal เข้ม</option>
+                <option value="tealCyan">B — Teal-Cyan สดใส</option>
+                <option value="tealSlate">C — Teal-Slate นุ่ม</option>
+              </optgroup>
+              <optgroup label="── สีไทย ──">
+                <option value="namWai">น้ำไหล</option>
+                <option value="saraBua">สระบัว</option>
+                <option value="siladonKhem">ศิลาดลเข้ม</option>
+                <option value="faMon">ฟ้าหม่น</option>
+                <option value="khonNakYung">ขนคอนางนกยูง</option>
+                <option value="kram">คราม</option>
+                <option value="namNgoen">น้ำเงินเจ้าฟ้า</option>
+                <option value="namNgoenNok">น้ำเงินนกพิราบ</option>
+              </optgroup>
+            </select>
+          </div>
           <button className="nav-icon-btn" title="แจ้งเตือน">
             <span style={{ display: "inline-flex", width: 18, height: 18 }}>{IC.bell}</span>
             <span className="notification-dot">1</span>
@@ -300,7 +353,7 @@ export function UiPreviewClient() {
       <div className="main-layout">
         {/* ── SIDEBAR ─────────────────────────────────────────────── */}
         {navOpen && (
-          <aside className="sidebar" id="mainSidebar" style={dark ? {background:"#0b132a",borderRight:"1px solid #152243"} : {}}>
+          <aside className="sidebar" id="mainSidebar" style={dark ? {background:currentTheme.sidebarBg,borderRight:`1px solid ${currentTheme.border}`} : {}}>
             <nav style={{padding:"12px 0",overflowY:"auto",flex:1}}>
               {NAV_GROUPS.map((g, gIdx) => {
                 const isOpen = openGroups[gIdx] ?? true;
@@ -315,13 +368,15 @@ export function UiPreviewClient() {
                         borderRadius:12, cursor:"pointer", border:"none",
                         fontSize:13, fontWeight:800, letterSpacing:"0.03em",
                         transition:"background .15s",
-                        ...(dark
-                          ? {background:"#111c38",color:"#93c5fd",borderColor:"#1b2d58"}
-                          : {background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0"}),
+                        ...(isVivid
+                          ? {background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0"}
+                          : isLightSidebar
+                            ? {background:"rgba(0,0,0,0.07)",color:"#1e293b",border:"1px solid rgba(0,0,0,0.1)"}
+                            : {background:"rgba(255,255,255,0.08)",color:"#93c5fd",borderColor:"rgba(255,255,255,0.1)"}),
                       }}
                     >
                       <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-                        {dark && <span style={{width:8,height:8,borderRadius:"50%",background:"#0071e3",flexShrink:0,display:"inline-block"}} />}
+                        {dark && <span style={{width:8,height:8,borderRadius:"50%",background:pri,flexShrink:0,display:"inline-block"}} />}
                         <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.group}</span>
                       </div>
                       <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
@@ -337,9 +392,10 @@ export function UiPreviewClient() {
                         {g.items.map((item) => {
                           const isActive = item.active;
                           const lightActive = {color:"#e91e63",fontWeight:700,background:"#fff5f8",borderLeft:"4px solid #e91e63"};
-                          const darkActive  = {color:"#fff",fontWeight:700,background:"#2563eb",borderRadius:14};
+                          const darkActive  = {color:"#fff",fontWeight:700,background:pri,borderRadius:14};
+                          const lightSidebarActive = {color:pri,fontWeight:700,background:"rgba(0,0,0,0.1)",borderLeft:`4px solid ${pri}`};
                           const lightBase   = {color:"#64748b",fontWeight:500};
-                          const darkBase    = {color:"#94a3b8",fontWeight:600};
+                          const darkBase    = {color: isLightSidebar ? "#1e293b" : "#94a3b8",fontWeight:600};
                           return (
                             <a
                               key={item.label}
@@ -349,7 +405,9 @@ export function UiPreviewClient() {
                                 textDecoration:"none",fontSize:14,transition:"all .15s",
                                 margin: dark ? "2px 8px" : "1px 0",
                                 borderRadius: dark ? 14 : 0,
-                                ...(isActive ? (dark ? darkActive : lightActive) : (dark ? darkBase : lightBase)),
+                                ...(isActive
+                                  ? (isVivid ? lightActive : isLightSidebar ? lightSidebarActive : darkActive)
+                                  : (isVivid ? lightBase : darkBase)),
                               }}
                             >
                               <span style={{width:20,textAlign:"center",fontSize:16,flexShrink:0}}>{item.emoji}</span>
