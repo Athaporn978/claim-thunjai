@@ -365,14 +365,14 @@ export function UiPreviewClient() {
                       style={{
                         display:"flex", alignItems:"center", justifyContent:"space-between",
                         gap:10, padding:"8px 12px", margin:"4px 12px", width:"calc(100% - 24px)",
-                        borderRadius:12, cursor:"pointer", border:"none",
+                        borderRadius:12, cursor:"pointer",
                         fontSize:13, fontWeight:800, letterSpacing:"0.03em",
                         transition:"background .15s",
                         ...(isVivid
                           ? {background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0"}
                           : isLightSidebar
                             ? {background:"rgba(0,0,0,0.07)",color:"#1e293b",border:"1px solid rgba(0,0,0,0.1)"}
-                            : {background:"rgba(255,255,255,0.08)",color:"#93c5fd",borderColor:"rgba(255,255,255,0.1)"}),
+                            : {background:"rgba(255,255,255,0.08)",color:"#93c5fd",border:"none"}),
                       }}
                     >
                       <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
