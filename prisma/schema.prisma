@@ -397,6 +397,12 @@ model UploadTransactionLog {
   quotationId String?
   quotationNo String?
 
+  /// Join key into ApiUsageLog for this scan's Claude call (null when the
+  /// local pdf-parse path answered and no AI was used). Deliberately an id,
+  /// not a cost figure: cost stays in ApiUsageLog and is only ever joined in
+  /// server-side for the system owner.
+  apiUsageLogId Int?
+
   createdAt DateTime @default(now())
 
   @@index([createdAt])

@@ -11,6 +11,7 @@ export type RecordUploadInput = {
   success?: boolean;
   errorMessage?: string | null;
   itemsFound?: number;
+  apiUsageLogId?: number | null;
 };
 
 /**
@@ -35,6 +36,7 @@ export async function recordUploadTransaction(input: RecordUploadInput): Promise
         // Guard against an oversized stack trace bloating the table.
         errorMessage: input.errorMessage ? input.errorMessage.slice(0, 500) : null,
         itemsFound: input.itemsFound ?? 0,
+        apiUsageLogId: input.apiUsageLogId ?? null,
       },
       select: { id: true },
     });

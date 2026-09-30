@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
     userEmail: string; userName: string; branchName: string | null;
     fileName: string; fileCount: number; mode: "single" | "batch"; pageCount: number;
   } | null = null;
+  // Hoisted out of the try so the catch can link a failed scan to its cost row.
+  let usageLogId: number | null = null;
 
   try {
     const body = (await req.json()) as any;
@@ -86,7 +88,6 @@ export async function POST(req: NextRequest) {
     let pdfTextExtracted = false;
     // Returned to the client so that, once the user saves the case, the save can
     // link this call's cost to the resulting quotation (it doesn't exist yet here).
-    let usageLogId: number | null = null;
 
     // 1. Try direct PDF text parsing via pdf-parse
     let pdfParse: any = null;
@@ -348,7 +349,8 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
         } catch (apiErr) {
           // A failed call still costs money and still took time — record it so the
           // spend burned on retries is visible, then rethrow into the existing handler.
-          await recordUsage({
+          // Captured so the ledger can still point at this wasted spend.
+          usageLogId = await recordUsage({
             route: "/api/extract-quote",
             model: EXTRACT_MODEL,
             success: false,
@@ -403,7 +405,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
       // Not billable (success: false), but still recorded so the re-scan that
       // follows is visible as a separate attempt.
       if (scanLog) {
-        await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0 });
+        await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0, apiUsageLogId: usageLogId });
       }
       return NextResponse.json({ error: errMsg }, { status: 422 });
     }
@@ -482,7 +484,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
     // paths (local pdf-parse and Claude), since either one is a transaction the
     // customer is invoiced for.
     const uploadLogId = scanLog
-      ? await recordUploadTransaction({ ...scanLog, success: true, itemsFound: cleanItems.length })
+      ? await recordUploadTransaction({ ...scanLog, success: true, itemsFound: cleanItems.length, apiUsageLogId: usageLogId })
       : null;
 
     return NextResponse.json({
@@ -496,7 +498,7 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
     console.error("Extract quote error:", err);
     const errMsg = err instanceof Error ? err.message : "Unknown extraction error";
     if (scanLog) {
-      await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0 });
+      await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0, apiUsageLogId: usageLogId });
     }
     return NextResponse.json(
       { error: errMsg },

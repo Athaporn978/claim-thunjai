@@ -49,7 +49,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ✅ **แยกตาราง Log ค่าใช้จ่ายภายใน ออกจาก Log ที่ลูกค้าเห็น**:
   - *ผลลัพธ์*: ✅ **สำเร็จ (Passed)**
   - *รายละเอียด*: `ApiUsageLog` (ต้นทุน AI/token/USD) = ภายในเท่านั้น ห้ามโชว์ลูกค้า / `UploadTransactionLog` (ใคร-เมื่อไหร่-ไฟล์ไหน-เคสอะไร) = ใช้ออก invoice ลูกค้าเห็นได้
-  - *กฎเหล็ก*: **ห้ามเพิ่มฟิลด์ต้นทุน/USD/token เข้า `UploadTransactionLog` หรือหน้า `/reports/upload-transactions` เด็ดขาด** เพราะรายงานนี้ส่งให้ลูกค้าที่ถูกเรียกเก็บเงินดู ถ้าโชว์ต้นทุนจะเปิดเผย margin ของบริษัท
+  - *กฎเหล็ก*: **ห้ามเพิ่มฟิลด์ต้นทุน/USD/token เข้าตาราง `UploadTransactionLog` เด็ดขาด** (มีได้แค่ `apiUsageLogId` ที่เป็นกุญแจเชื่อม) และหน้า `/reports/upload-transactions` **แสดงต้นทุน/กำไรได้เฉพาะบัญชีเจ้าของระบบ โดยต้องกรองที่ฝั่ง server ใน API เท่านั้น** (`isSystemOwner()` จาก env `SYSTEM_OWNER_EMAILS`) ห้ามใช้วิธีซ่อนที่หน้าจอ และ**ห้ามผูกกับ Role ใน DB** เพราะ Super Admin ของลูกค้าแก้ Role ให้ตัวเองได้ผ่าน `/admin/roles`
 
 # Core Business Logic: Price Matching (Logic การจับคู่ราคาค่าแรง & อะไหล่)
 - **ค่าแรง (Labor) — มีการ match อัตโนมัติกับราคากลาง**: ใช้ `src/app/api/extract-quote/route.ts` (เริ่มบรรทัด ~314)
@@ -86,6 +86,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **PM2 Process Name / ID**: `demo-claim` (ID: **2**) — ID 6 ปัจจุบันคือ `chat-thunjai` คนละโปรเจกต์
 - **Port**: `3125` (nginx reverse proxy → `127.0.0.1:3125`)
 - **ไฟล์ฐานข้อมูล Production**: `prisma/demo.db` (~426MB) — **ไม่ใช่ `dev.db`** (`dev.db` คือของเครื่อง Local)
+- **env ที่ต้องมีใน `.env` ทั้ง Local และ Production**: `ANTHROPIC_API_KEY`, `DATABASE_URL`, `SYSTEM_OWNER_EMAILS` (อีเมลเจ้าของระบบ คั่นด้วย `,`), `USD_TO_THB` (อัตราแปลงต้นทุน AI) — ดู `.env.example`
 - **Live Production URL**: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
 
 - **Zero-Downtime Deployment Command**:

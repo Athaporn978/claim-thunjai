@@ -13,6 +13,12 @@ type Row = {
   fileCount: number;
   pageCount: number;
   amountThb: number;
+  // Present only when the API judged the session to be the system owner.
+  aiUsed?: boolean;
+  model?: string | null;
+  costUsd?: number;
+  costThb?: number;
+  profitThb?: number;
   mode: string;
   success: boolean;
   errorMessage: string | null;
@@ -22,7 +28,12 @@ type Row = {
   createdAt: string;
 };
 
-type Summary = { total: number; billable: number; failed: number; totalPages: number; totalAmountThb: number };
+type Summary = {
+  total: number; billable: number; failed: number; totalPages: number; totalAmountThb: number;
+  // Owner-only extras — absent for everyone else, by server-side design.
+  owner?: true; usdToThb?: number; usdToThbNote?: string | null; totalCostUsd?: number; totalCostThb?: number;
+  totalProfitThb?: number; marginPct?: number; noAiScans?: number;
+};
 
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("th-TH", {
@@ -165,10 +176,19 @@ export default function UploadTransactionsReport() {
       "รายการซ่อมที่อ่านได้": r.itemsFound,
       "จำนวนเงิน (บาท)": r.amountThb,
       "หมายเหตุ": r.errorMessage || "",
+      ...(summary?.owner
+        ? {
+            "ใช้ AI": r.aiUsed ? "ใช่" : "ไม่",
+            "ต้นทุน AI (USD)": Number((r.costUsd ?? 0).toFixed(4)),
+            "ต้นทุน AI (บาท)": Number((r.costThb ?? 0).toFixed(2)),
+            "กำไร (บาท)": Number((r.profitThb ?? 0).toFixed(2)),
+          }
+        : {}),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = [{ wch: 5 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 22 },
-      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 40 },
+      ...(summary?.owner ? [{ wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 14 }] : [])];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Upload Transactions");
     XLSX.writeFile(wb, `upload-transactions-${from}_${to}.xlsx`);
@@ -270,6 +290,51 @@ export default function UploadTransactionsReport() {
         </div>
       )}
 
+      {summary?.owner && (
+        <div className="mb-5 rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-base">🔒</span>
+            <span className="text-sm font-extrabold text-amber-900">
+              {th ? "ข้อมูลภายในเจ้าของระบบ" : "System-owner internal data"}
+            </span>
+            <span className="text-[11px] font-semibold text-amber-800/80 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg">
+              {th ? "แสดงเฉพาะบัญชีเจ้าของ — พนักงานและลูกค้าไม่เห็นส่วนนี้" : "Owner accounts only — hidden from staff and customers"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="rounded-xl bg-white border border-amber-200 p-4 text-center">
+              <div className="text-[11px] font-bold text-slate-500">{th ? "รายได้ (เก็บลูกค้า)" : "Revenue"}</div>
+              <div className="text-2xl font-black text-[#0071e3] tabular-nums mt-1">฿{fmtBaht(summary.totalAmountThb, lang as "th" | "en")}</div>
+            </div>
+            <div className="rounded-xl bg-white border border-amber-200 p-4 text-center">
+              <div className="text-[11px] font-bold text-slate-500">{th ? "ต้นทุน AI (จ่าย Anthropic)" : "AI cost"}</div>
+              <div className="text-2xl font-black text-amber-700 tabular-nums mt-1">฿{fmtBaht(summary.totalCostThb ?? 0, lang as "th" | "en")}</div>
+              <div className="text-[11px] text-slate-400 tabular-nums">${(summary.totalCostUsd ?? 0).toFixed(4)}</div>
+            </div>
+            <div className="rounded-xl bg-white border border-amber-200 p-4 text-center">
+              <div className="text-[11px] font-bold text-slate-500">{th ? "กำไร" : "Profit"}</div>
+              <div className={`text-2xl font-black tabular-nums mt-1 ${(summary.totalProfitThb ?? 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                {(summary.totalProfitThb ?? 0) < 0 ? "-" : ""}฿{fmtBaht(Math.abs(summary.totalProfitThb ?? 0), lang as "th" | "en")}
+              </div>
+            </div>
+            <div className="rounded-xl bg-white border border-amber-200 p-4 text-center">
+              <div className="text-[11px] font-bold text-slate-500">{th ? "อัตรากำไร (Margin)" : "Margin"}</div>
+              <div className={`text-2xl font-black tabular-nums mt-1 ${(summary.marginPct ?? 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                {(summary.marginPct ?? 0).toFixed(1)}%
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-[11px] text-amber-900/80 font-medium flex flex-wrap gap-x-4 gap-y-1">
+            <span>
+              {th ? `อัตราที่ใช้: 1 USD = ${summary.usdToThb} THB` : `Rate used: 1 USD = ${summary.usdToThb} THB`}
+              {summary.usdToThbNote ? ` — ${summary.usdToThbNote}` : ""}
+              {th ? " (ตั้งค่าใน USD_TO_THB)" : " (USD_TO_THB)"}
+            </span>
+            <span>{th ? `เคสที่ไม่ใช้ AI เลย (ต้นทุน 0): ${summary.noAiScans ?? 0} จาก ${summary.total}` : `Scans with no AI (zero cost): ${summary.noAiScans ?? 0} of ${summary.total}`}</span>
+          </div>
+        </div>
+      )}
+
       {err && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700 font-semibold">
           ⚠️ {err}
@@ -289,15 +354,21 @@ export default function UploadTransactionsReport() {
                 <th className="px-3 py-3">{th ? "จำนวนหน้า" : "Pages"}</th>
                 <th className="px-3 py-3">{th ? "สถานะ" : "Status"}</th>
                 <th className="px-3 py-3">{th ? "จำนวนเงิน (บาท)" : "Amount (THB)"}</th>
+                {summary?.owner && (
+                  <>
+                    <th className="px-3 py-3 bg-amber-100/70 text-amber-900">{th ? "ต้นทุน AI" : "AI cost"}</th>
+                    <th className="px-3 py-3 bg-amber-100/70 text-amber-900">{th ? "กำไร" : "Profit"}</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={summary?.owner ? 9 : 7} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "กำลังโหลด..." : "Loading..."}
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={summary?.owner ? 9 : 7} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "ไม่พบข้อมูลในช่วงเวลาที่เลือก" : "No records in the selected range"}
                 </td></tr>
               ) : pagedRows.map((r) => (
@@ -358,6 +429,25 @@ export default function UploadTransactionsReport() {
                       <span className="text-[11px] text-slate-300 font-medium">฿0.00</span>
                     )}
                   </td>
+                  {summary?.owner && (
+                    <>
+                      <td className="px-3 py-2.5 text-center whitespace-nowrap bg-amber-50/60">
+                        {r.aiUsed ? (
+                          <div>
+                            <div className="text-xs font-bold text-amber-900 tabular-nums">฿{fmtBaht(r.costThb ?? 0, lang as "th" | "en")}</div>
+                            <div className="text-[10px] text-amber-700/70 tabular-nums">${(r.costUsd ?? 0).toFixed(4)}</div>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-emerald-700">{th ? "฿0 · ไม่ใช้ AI" : "฿0 · no AI"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-center whitespace-nowrap bg-amber-50/60">
+                        <span className={`text-xs font-extrabold tabular-nums ${(r.profitThb ?? 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                          {(r.profitThb ?? 0) < 0 ? "-" : ""}฿{fmtBaht(Math.abs(r.profitThb ?? 0), lang as "th" | "en")}
+                        </span>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

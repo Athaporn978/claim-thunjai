@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { systemOwnerEmails } from "@/lib/session";
 import { logAudit } from "@/lib/auditLog";
 import { hashPassword } from "@/lib/password";
 
@@ -32,6 +33,9 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
       include: { branch: true, role: true },
     });
+    // The vendor's own account is white-labelled out of the customer's staff list.
+    const owners = systemOwnerEmails();
+    const visibleEmployees = employees.filter((e) => !owners.has(e.email.toLowerCase()));
 
     if (employees.length === 0 && defaultBranch && defaultRole) {
       const seedPassword = await hashPassword("password123");
@@ -48,7 +52,7 @@ export async function GET() {
       return NextResponse.json({ employees: result });
     }
 
-    return NextResponse.json({ employees });
+    return NextResponse.json({ employees: visibleEmployees });
   } catch (err) {
     console.error("GET employees error:", err);
     return NextResponse.json({ employees: [], error: String(err) }, { status: 500 });

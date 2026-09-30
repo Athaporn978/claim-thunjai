@@ -16,6 +16,25 @@ export type SessionPayload = {
   exp: number; // epoch ms
 };
 
+/**
+ * Emails that own the system (the vendor, not the customer's admins). Read
+ * from the environment on purpose: Role.permissions lives in the DB and is
+ * editable from /admin/roles by the customer's own Super Admin, so anything
+ * gated on a DB role could be self-granted. An env var cannot.
+ */
+export function systemOwnerEmails(): Set<string> {
+  return new Set(
+    (process.env.SYSTEM_OWNER_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export function isSystemOwner(session: Pick<SessionPayload, "email"> | null | undefined): boolean {
+  return !!session && systemOwnerEmails().has(session.email.toLowerCase());
+}
+
 /** Super Admin roles carry the "all" permission — used to gate /api/admin/* and other restricted routes. */
 export function isSuperAdmin(session: Pick<SessionPayload, "permissions">): boolean {
   return Array.isArray(session.permissions) && session.permissions.includes("all");
