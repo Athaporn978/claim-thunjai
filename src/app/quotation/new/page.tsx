@@ -52,6 +52,258 @@ const VEHICLE_CATEGORIES = [
   { v: "van", th: "รถตู้ / MPV", en: "Van / MPV" },
 ];
 
+const MAX_BATCH_FILES = 5;
+
+type ScanPayload = { data: string; mediaType: string; name: string };
+
+type BatchJob = {
+  name: string;
+  status: "pending" | "scanning" | "saving" | "done" | "error";
+  error?: string;
+  quotationId?: string;
+  quotationNo?: string;
+  customerName?: string;
+  itemCount?: number;
+};
+
+function resolveSessionUser() {
+  let s: any = null;
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("claim_user_session") : null;
+    if (raw) s = JSON.parse(raw);
+  } catch {}
+  const email = s?.email || "somchai@htechnology.com";
+  return {
+    email,
+    name: s?.name || s?.fullName || (email.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี"),
+    branch: s?.branchName || s?.branch || (email.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)"),
+    role: s?.roleName || s?.role?.name || "เจ้าหน้าที่คุมราคา",
+  };
+}
+
+async function fileToScanPayload(file: File): Promise<ScanPayload> {
+  // Images are resized/re-encoded client-side before ever becoming base64 —
+  // uncompressed phone photos (3-8MB each) were blowing past the request
+  // body-size cap once a case had several of them, silently corrupting the
+  // save. PDFs pass through untouched (can't canvas-compress a PDF).
+  if (file.type.startsWith("image/")) {
+    const { data, mediaType } = await compressImageToBase64(file);
+    return { data, mediaType, name: file.name };
+  }
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      resolve(res.split(",")[1] || res);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  return {
+    data: base64,
+    mediaType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
+    name: file.name,
+  };
+}
+
+function buildFormFromExtraction(meta: any, items: any[], files: ScanPayload[]): QuotationInput {
+  let matchedBrandName = meta.vehicleBrand || "";
+  let matchedModelName = meta.vehicleModel || "";
+  let category = "sedan_asia";
+  let size = "B";
+
+  if (matchedBrandName) {
+    const brandObj = BRANDS.find(
+      (b) =>
+        b.name.toLowerCase().includes((matchedBrandName || "").toLowerCase()) ||
+        (matchedBrandName || "").toLowerCase().includes(b.name.toLowerCase())
+    );
+    if (brandObj) {
+      matchedBrandName = brandObj.name;
+      const modelObj = brandObj.models.find(
+        (m) =>
+          m.name.toLowerCase().includes((matchedModelName || "").toLowerCase()) ||
+          (matchedModelName || "").toLowerCase().includes(m.name.toLowerCase())
+      );
+      if (modelObj) {
+        matchedModelName = modelObj.name;
+        category = modelObj.vehicleType || category;
+        size = modelObj.size || size;
+      } else if (brandObj.models.length > 0) {
+        matchedModelName = brandObj.models[0].name;
+        category = brandObj.models[0].vehicleType || category;
+        size = brandObj.models[0].size || size;
+      }
+    }
+  }
+
+  const photos: QuotationPhoto[] = files
+    .filter((f) => f.mediaType.startsWith("image/"))
+    .map((f) => ({
+      url: `data:${f.mediaType};base64,${f.data}`,
+      caption: `ใบเสนอราคา (${f.name})`,
+    }));
+
+  const formattedItems: QuotationItemInput[] = items.map((i: any, index: number) => {
+    const itemType = i.type === "labor" ? "labor" : "part";
+    const quoted = Number(i.unitPrice) || 0;
+    const std = i.standardPrice != null ? Number(i.standardPrice) : null;
+    // std === 0 means "no standard price found" (see extract-quote/route.ts),
+    // not a genuine zero price — must not be treated as cheaper than quoted,
+    // or the controlled price would incorrectly collapse to ฿0.
+    const controlled = (std != null && std > 0 && std < quoted) ? std : quoted;
+    return {
+      type: itemType as ItemType,
+      name: i.name,
+      quotedUnit: quoted,
+      quotedQty: Number(i.qty) || 1,
+      controlledUnit: controlled,
+      controlledQty: Number(i.qty) || 1,
+      standardPrice: std ?? 0,
+      sortOrder: index,
+    };
+  });
+
+  return {
+    ...EMPTY,
+    customerName: meta.customerName || "",
+    licensePlate: meta.licensePlate || "",
+    vehicleCategory: category || "sedan_asia",
+    vehicleBrand: matchedBrandName || meta.vehicleBrand || "",
+    vehicleModel: matchedModelName || meta.vehicleModel || "",
+    vehicleYear: meta.vehicleYear || 2026,
+    vehicleSize: size || "B",
+    chassisNo: meta.chassisNo || "",
+    color: meta.color || "",
+    mileage: meta.mileage || null,
+    insurerName: meta.insurerName || "",
+    claimNo: meta.claimNo || "",
+    policyNo: meta.policyNo || "",
+    policyType: meta.policyType || "ชั้น 1",
+    centerName: meta.centerName || "",
+    centerAddress: meta.centerAddress || "",
+    centerContact: meta.centerContact || "",
+    discountPercent: meta.discountPercent ?? 15,
+    discountAmount: (meta.discountAmount && Number(meta.discountAmount) > 0) ? Number(meta.discountAmount) : 0,
+    includeVat: meta.includeVat ?? true,
+    photos,
+    items: formattedItems,
+  };
+}
+
+function BatchProgressPanel({
+  jobs, running, lang, onClose, onGoToList,
+}: {
+  jobs: BatchJob[]; running: boolean; lang: string;
+  onClose: () => void; onGoToList: () => void;
+}) {
+  const total = jobs.length;
+  const done = jobs.filter((j) => j.status === "done").length;
+  const failed = jobs.filter((j) => j.status === "error").length;
+  const settled = done + failed;
+  const pct = total === 0 ? 0 : Math.round((settled / total) * 100);
+
+  return (
+    <div className="mb-4 bg-white border border-blue-200 rounded-xl p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📚</span>
+          <span className="font-bold text-slate-800 text-sm">
+            {lang === "th" ? "อัปโหลดหลายเคส" : "Batch upload"}
+          </span>
+          <span className="text-xs font-bold text-[#0071e3] bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
+            {lang === "th" ? `สำเร็จแล้ว ${done}/${total}` : `${done}/${total} done`}
+          </span>
+          {failed > 0 && (
+            <span className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+              {lang === "th" ? `ไม่สำเร็จ ${failed}` : `${failed} failed`}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!running && done > 0 && (
+            <button
+              type="button"
+              onClick={onGoToList}
+              className="px-3.5 py-1.5 rounded-lg bg-[#0071e3] hover:bg-blue-600 text-white text-xs font-bold transition cursor-pointer"
+            >
+              {lang === "th" ? "ไปหน้ารายการเคส →" : "Go to case list →"}
+            </button>
+          )}
+          {!running && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={lang === "th" ? "ปิด" : "Close"}
+              className="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer text-sm font-bold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="h-1.5 w-full bg-blue-100 rounded-full overflow-hidden mb-3">
+        <div className="h-full bg-[#0071e3] transition-all duration-500 rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+
+      <ul className="space-y-1.5">
+        {jobs.map((j, i) => (
+          <li
+            key={`${j.name}-${i}`}
+            className="flex flex-wrap items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"
+          >
+            <span className="font-mono text-slate-400 shrink-0">{i + 1}.</span>
+            <span className="font-semibold text-slate-700 truncate max-w-[220px]" title={j.name}>{j.name}</span>
+
+            {j.status === "pending" && (
+              <span className="ml-auto text-slate-400 font-medium">{lang === "th" ? "รอคิว" : "Queued"}</span>
+            )}
+            {(j.status === "scanning" || j.status === "saving") && (
+              <span className="ml-auto flex items-center gap-1.5 text-[#0071e3] font-bold">
+                <span className="w-3 h-3 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
+                {j.status === "scanning"
+                  ? (lang === "th" ? "AI กำลังอ่าน..." : "Scanning...")
+                  : (lang === "th" ? "กำลังบันทึกเคส..." : "Saving...")}
+              </span>
+            )}
+            {j.status === "done" && (
+              <>
+                <span className="text-slate-500 truncate">
+                  {j.customerName || (lang === "th" ? "ไม่พบชื่อลูกค้า" : "No customer name")}
+                  {" · "}
+                  {lang === "th" ? `${j.itemCount} รายการ` : `${j.itemCount} items`}
+                </span>
+                <a
+                  href={`/quotation/new?id=${j.quotationId}`}
+                  className="ml-auto flex items-center gap-1.5 text-emerald-700 font-bold hover:underline shrink-0"
+                >
+                  <span>✅</span>
+                  <span>{j.quotationNo || (lang === "th" ? "เปิดเคส" : "Open case")}</span>
+                </a>
+              </>
+            )}
+            {j.status === "error" && (
+              <span className="ml-auto flex items-center gap-1.5 text-red-700 font-bold text-right">
+                <span>❌</span>
+                <span className="font-semibold">{j.error}</span>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {!running && failed > 0 && (
+        <p className="mt-2.5 text-[11px] text-slate-500">
+          {lang === "th"
+            ? "เคสที่ไม่สำเร็จไม่ถูกบันทึก สามารถอัปโหลดไฟล์นั้นใหม่อีกครั้งได้"
+            : "Failed files were not saved — you can re-upload them."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function VinField({ value, onChange, make, year, lang }: {
   value: string | null | undefined; onChange: (v: string) => void;
   make?: string; year?: string | number; lang: string;
@@ -122,6 +374,8 @@ function Wizard() {
   // Cost row for the AI scan that populated this form, linked to the quotation
   // on first save. A ref, not state: it must never trigger a re-render.
   const scanUsageLogId = useRef<number | null>(null);
+  // Billing-ledger row for that same scan, linked to the case on first save.
+  const scanUploadLogId = useRef<number | null>(null);
   const [insurerCustom, setInsurerCustom] = useState(false);
   const [centerCustom, setCenterCustom] = useState(false);
   const [step, setStep] = useState(0);
@@ -137,6 +391,8 @@ function Wizard() {
   const [uploadedFileSignatures, setUploadedFileSignatures] = useState<string[]>([]);
   const [prefillNote, setPrefillNote] = useState<string>("");
   const [saveToast, setSaveToast] = useState<{ msg: string } | null>(null);
+  const [batchJobs, setBatchJobs] = useState<BatchJob[] | null>(null);
+  const [batchRunning, setBatchRunning] = useState(false);
   const skipGuard = useRef(false);
 
   const resetWizardForm = useCallback(() => {
@@ -150,6 +406,7 @@ function Wizard() {
     setDuplicateNoticeMsg(null);
     // Clear too, or a fresh case would inherit the previous scan's cost row.
     scanUsageLogId.current = null;
+    scanUploadLogId.current = null;
   }, []);
 
   // Reset form when opening a new quotation
@@ -191,14 +448,16 @@ function Wizard() {
   // beforeunload guard for full page reload/close
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (dirty && !skipGuard.current) {
+      // batchRunning too: the batch loop lives in this page, so leaving mid-run
+      // abandons every file that hasn't been saved yet.
+      if ((dirty || batchRunning) && !skipGuard.current) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  }, [dirty, batchRunning]);
 
   // Intercept Next.js client-side link clicks (Header, Navbar, Logo) when form is dirty
   useEffect(() => {
@@ -251,17 +510,7 @@ function Wizard() {
   const save = async (opts?: { finalize?: boolean; thenView?: boolean }) => {
     setSaving(true);
     try {
-      let sessionUser: any = null;
-      try {
-        const raw = typeof window !== "undefined" ? localStorage.getItem("claim_user_session") : null;
-        if (raw) sessionUser = JSON.parse(raw);
-      } catch {}
-
-      const userEmail = sessionUser?.email || "somchai@htechnology.com";
-      const userName = sessionUser?.name || sessionUser?.fullName || (userEmail.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี");
-      const userBranch = sessionUser?.branchName || sessionUser?.branch || (userEmail.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)");
-
-      const userRole = sessionUser?.roleName || sessionUser?.role?.name || "เจ้าหน้าที่คุมราคา";
+      const { email: userEmail, name: userName, branch: userBranch, role: userRole } = resolveSessionUser();
       const payload: any = {
         ...form,
         createdByName: userName,
@@ -271,6 +520,7 @@ function Wizard() {
         // Only meaningful on the first save (POST) of an AI-scanned case; the
         // server ignores it otherwise.
         usageLogId: scanUsageLogId.current,
+        uploadLogId: scanUploadLogId.current,
         // For EDITED audit log on PUT
         _editorName: userName,
         _editorRole: userRole,
@@ -352,33 +602,9 @@ function Wizard() {
     }, 350);
 
     try {
-      const fileArray: { data: string; mediaType: string; name: string }[] = [];
+      const fileArray: ScanPayload[] = [];
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        // Images are resized/re-encoded client-side before ever becoming base64 —
-        // uncompressed phone photos (3-8MB each) were blowing past the request
-        // body-size cap once a case had several of them, silently corrupting the
-        // save. PDFs pass through untouched (can't canvas-compress a PDF).
-        if (file.type.startsWith("image/")) {
-          const { data, mediaType } = await compressImageToBase64(file);
-          fileArray.push({ data, mediaType, name: file.name });
-        } else {
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const res = reader.result as string;
-              const base64Data = res.split(",")[1] || res;
-              resolve(base64Data);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          fileArray.push({
-            data: base64,
-            mediaType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
-            name: file.name,
-          });
-        }
+        fileArray.push(await fileToScanPayload(files[i]));
       }
 
       const res = await fetch("/api/extract-quote", {
@@ -402,92 +628,15 @@ function Wizard() {
       // Carried through to the save so the scan's AI cost can be attributed to
       // the quotation it produced (see linkUsageToQuotation).
       scanUsageLogId.current = typeof data.usageLogId === "number" ? data.usageLogId : null;
+      scanUploadLogId.current = typeof data.uploadLogId === "number" ? data.uploadLogId : null;
 
-      let matchedBrandName = meta.vehicleBrand || "";
-      let matchedModelName = meta.vehicleModel || "";
-      let category = "sedan_asia";
-      let size = "B";
-
-      if (matchedBrandName) {
-        const brandObj = BRANDS.find(
-          (b) =>
-            b.name.toLowerCase().includes((matchedBrandName || "").toLowerCase()) ||
-            (matchedBrandName || "").toLowerCase().includes(b.name.toLowerCase())
-        );
-        if (brandObj) {
-          matchedBrandName = brandObj.name;
-          const modelObj = brandObj.models.find(
-            (m) =>
-              m.name.toLowerCase().includes((matchedModelName || "").toLowerCase()) ||
-              (matchedModelName || "").toLowerCase().includes(m.name.toLowerCase())
-          );
-          if (modelObj) {
-            matchedModelName = modelObj.name;
-            category = modelObj.vehicleType || category;
-            size = modelObj.size || size;
-          } else if (brandObj.models.length > 0) {
-            matchedModelName = brandObj.models[0].name;
-            category = brandObj.models[0].vehicleType || category;
-            size = brandObj.models[0].size || size;
-          }
-        }
-      }
-
-      const newPhotos: QuotationPhoto[] = fileArray
-        .filter((f) => f.mediaType.startsWith("image/"))
-        .map((f, idx) => ({
-          url: `data:${f.mediaType};base64,${f.data}`,
-          caption: `ใบเสนอราคา (${f.name})`,
-        }));
-
-      const formattedItems: QuotationItemInput[] = items.map((i: any, index: number) => {
-        const itemType = i.type === "labor" ? "labor" : "part";
-        const quoted = Number(i.unitPrice) || 0;
-        const std = i.standardPrice != null ? Number(i.standardPrice) : null;
-        // std === 0 means "no standard price found" (see extract-quote/route.ts),
-        // not a genuine zero price — must not be treated as cheaper than quoted,
-        // or the controlled price would incorrectly collapse to ฿0.
-        const controlled = (std != null && std > 0 && std < quoted) ? std : quoted;
-        return {
-          type: itemType,
-          name: i.name,
-          quotedUnit: quoted,
-          quotedQty: Number(i.qty) || 1,
-          controlledUnit: controlled,
-          controlledQty: Number(i.qty) || 1,
-          standardPrice: std ?? 0,
-          sortOrder: index,
-        };
-      });
+      const nextForm = buildFormFromExtraction(meta, items, fileArray);
+      const formattedItems = nextForm.items || [];
 
       // Short delay so user sees 100% complete bar
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      setForm({
-        ...EMPTY,
-        customerName: meta.customerName || "",
-        licensePlate: meta.licensePlate || "",
-        vehicleCategory: category || "sedan_asia",
-        vehicleBrand: matchedBrandName || meta.vehicleBrand || "",
-        vehicleModel: matchedModelName || meta.vehicleModel || "",
-        vehicleYear: meta.vehicleYear || 2026,
-        vehicleSize: size || "B",
-        chassisNo: meta.chassisNo || "",
-        color: meta.color || "",
-        mileage: meta.mileage || null,
-        insurerName: meta.insurerName || "",
-        claimNo: meta.claimNo || "",
-        policyNo: meta.policyNo || "",
-        policyType: meta.policyType || "ชั้น 1",
-        centerName: meta.centerName || "",
-        centerAddress: meta.centerAddress || "",
-        centerContact: meta.centerContact || "",
-        discountPercent: meta.discountPercent ?? 15,
-        discountAmount: (meta.discountAmount && Number(meta.discountAmount) > 0) ? Number(meta.discountAmount) : 0,
-        includeVat: meta.includeVat ?? true,
-        photos: newPhotos,
-        items: formattedItems,
-      });
+      setForm(nextForm);
 
       setDirty(true);
       setPrefillNote(
@@ -509,6 +658,85 @@ function Wizard() {
       setScanProgress(0);
       setScanStepText("");
       e.target.value = "";
+    }
+  };
+
+  // Batch scan: each file becomes its OWN draft case (unlike the single-scan
+  // path above, where several files are pages of one quote). Files are handled
+  // one at a time so each extraction gets its own fresh model context, and one
+  // bad file can't take the rest of the batch down with it.
+  const handleBatchScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+
+    const batch = picked.slice(0, MAX_BATCH_FILES);
+    const skipped = picked.length - batch.length;
+
+    setStepError("");
+    setBatchRunning(true);
+    setBatchJobs(batch.map((f) => ({ name: f.name, status: "pending" as const })));
+
+    const patch = (idx: number, p: Partial<BatchJob>) =>
+      setBatchJobs((prev) => (prev ? prev.map((j, i) => (i === idx ? { ...j, ...p } : j)) : prev));
+
+    const u = resolveSessionUser();
+
+    for (let i = 0; i < batch.length; i++) {
+      try {
+        patch(i, { status: "scanning" });
+        const payload = await fileToScanPayload(batch[i]);
+
+        const res = await fetch("/api/extract-quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: [payload], mode: "batch" }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || "อ่านเอกสารไม่สำเร็จ");
+
+        patch(i, { status: "saving" });
+        const draft = buildFormFromExtraction(data.metadata || {}, data.items || [], [payload]);
+
+        const saveRes = await fetch("/api/quotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...draft,
+            status: "draft",
+            createdByName: u.name,
+            createdByEmail: u.email,
+            branchName: u.branch,
+            usageLogId: typeof data.usageLogId === "number" ? data.usageLogId : null,
+            uploadLogId: typeof data.uploadLogId === "number" ? data.uploadLogId : null,
+          }),
+        });
+        const saved = await saveRes.json();
+        if (!saveRes.ok || !saved.quotation?.id) throw new Error(saved.error || "บันทึกเคสไม่สำเร็จ");
+
+        patch(i, {
+          status: "done",
+          quotationId: saved.quotation.id,
+          quotationNo: saved.quotation.quotationNo,
+          customerName: draft.customerName || "",
+          itemCount: draft.items?.length || 0,
+        });
+      } catch (err: any) {
+        console.error(`Batch scan failed for ${batch[i].name}:`, err);
+        patch(i, {
+          status: "error",
+          error: err?.message || (lang === "th" ? "ไม่สำเร็จ" : "Failed"),
+        });
+      }
+    }
+
+    setBatchRunning(false);
+    if (skipped > 0) {
+      setStepError(
+        lang === "th"
+          ? `เลือกมา ${picked.length} ไฟล์ ระบบประมวลผลได้สูงสุด ${MAX_BATCH_FILES} ไฟล์ต่อครั้ง (ข้าม ${skipped} ไฟล์สุดท้าย)`
+          : `Selected ${picked.length} files; max ${MAX_BATCH_FILES} per run (skipped the last ${skipped}).`
+      );
     }
   };
 
@@ -682,7 +910,7 @@ function Wizard() {
           <label
             title={dirty ? (lang === "th" ? "กรุณากด 'ล้างข้อมูล / เริ่มสแกนใหม่' ก่อนสแกนไฟล์ใหม่" : "Please reset form before scanning a new file") : undefined}
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-md ${
-              dirty || scanning
+              dirty || scanning || batchRunning
                 ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
                 : "bg-[#0071e3] hover:bg-blue-600 text-white cursor-pointer"
             }`}
@@ -703,12 +931,51 @@ function Wizard() {
               accept=".pdf,image/*"
               multiple
               onChange={handleAiScanUpload}
-              disabled={scanning || dirty}
+              disabled={scanning || dirty || batchRunning}
+              className="hidden"
+            />
+          </label>
+
+          <label
+            title={
+              lang === "th"
+                ? `อัปโหลดหลายไฟล์ สูงสุด ${MAX_BATCH_FILES} ไฟล์ — แต่ละไฟล์จะถูกสร้างเป็นเคสแยกกัน`
+                : `Upload up to ${MAX_BATCH_FILES} files — each becomes its own case`
+            }
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-md border-2 ${
+              scanning || batchRunning
+                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                : "bg-white text-[#0071e3] border-[#0071e3] hover:bg-blue-50 cursor-pointer"
+            }`}
+          >
+            {batchRunning ? (
+              <>
+                <span className="w-4 h-4 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
+                <span>{lang === "th" ? "กำลังสร้างหลายเคส..." : "Creating cases..."}</span>
+              </>
+            ) : (
+              <>
+                <span>📚</span>
+                <span>
+                  {lang === "th"
+                    ? `อัปโหลดหลายเคส (สูงสุด ${MAX_BATCH_FILES})`
+                    : `Batch upload (max ${MAX_BATCH_FILES})`}
+                </span>
+              </>
+            )}
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              multiple
+              onChange={handleBatchScanUpload}
+              disabled={scanning || batchRunning}
               className="hidden"
             />
           </label>
         </div>
       </div>
+
+      {batchJobs && <BatchProgressPanel jobs={batchJobs} running={batchRunning} lang={lang} onClose={() => setBatchJobs(null)} onGoToList={() => { skipGuard.current = true; router.push("/quotations"); }} />}
 
       {prefillNote && (
         <div className="mb-4 bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 text-sm text-emerald-900 flex flex-wrap items-center justify-between gap-3 shadow-xs">

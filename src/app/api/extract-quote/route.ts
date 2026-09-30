@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { canonicalBrand, lookupLaborPrice } from "@/lib/priceLookup";
 import { normalizePart } from "@/lib/partNameMap";
 import { recordUsage } from "@/lib/aiUsage";
+import { recordUploadTransaction } from "@/lib/uploadLog";
+import { getSession } from "@/lib/session";
 import type Anthropic from "@anthropic-ai/sdk";
 
 const EXTRACT_MODEL = "claude-sonnet-5";
@@ -19,12 +21,30 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // Declared outside the try so the catch can still attribute a failed scan.
+  let scanLog: {
+    userEmail: string; userName: string; branchName: string | null;
+    fileName: string; fileCount: number; mode: "single" | "batch";
+  } | null = null;
+
   try {
     const body = (await req.json()) as any;
     const files = body.files ?? body.images ?? [];
     if (!files.length) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
+
+    // Billing attribution comes from the signed session cookie, never from the
+    // request body — the browser must not be able to bill a scan to someone else.
+    const session = await getSession();
+    scanLog = {
+      userEmail: session?.email || "unknown",
+      userName: session?.name || "ไม่ทราบผู้ใช้งาน",
+      branchName: session?.branchName || null,
+      fileName: String(files[0]?.name || "ไม่ทราบชื่อไฟล์"),
+      fileCount: files.length,
+      mode: body.mode === "batch" ? "batch" : "single",
+    };
 
     let parsedResult: any = {};
     let pdfTextExtracted = false;
@@ -343,10 +363,13 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
     // 3. If neither pdf-parse nor AI could extract real repair items, fail explicitly.
     // Never fabricate placeholder customer/vehicle/item data — see AGENTS.md lesson log.
     if (!parsedResult.items || parsedResult.items.length === 0) {
-      return NextResponse.json(
-        { error: "ไม่สามารถอ่านรายการซ่อมจากเอกสารได้ กรุณาตรวจสอบคุณภาพไฟล์ หรือกรอกข้อมูลด้วยตนเอง" },
-        { status: 422 }
-      );
+      const errMsg = "ไม่สามารถอ่านรายการซ่อมจากเอกสารได้ กรุณาตรวจสอบคุณภาพไฟล์ หรือกรอกข้อมูลด้วยตนเอง";
+      // Not billable (success: false), but still recorded so the re-scan that
+      // follows is visible as a separate attempt.
+      if (scanLog) {
+        await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0 });
+      }
+      return NextResponse.json({ error: errMsg }, { status: 422 });
     }
 
     const rawItems = Array.isArray(parsedResult) ? parsedResult : parsedResult.items || [];
@@ -419,16 +442,28 @@ Return ONLY valid JSON. If the document is not a vehicle repair quotation, set i
       includeVat: true,
     };
 
+    // Billable: the scan produced usable items. Written on BOTH extraction
+    // paths (local pdf-parse and Claude), since either one is a transaction the
+    // customer is invoiced for.
+    const uploadLogId = scanLog
+      ? await recordUploadTransaction({ ...scanLog, success: true, itemsFound: cleanItems.length })
+      : null;
+
     return NextResponse.json({
       success: true,
       metadata,
       items: cleanItems,
       usageLogId,
+      uploadLogId,
     });
   } catch (err) {
     console.error("Extract quote error:", err);
+    const errMsg = err instanceof Error ? err.message : "Unknown extraction error";
+    if (scanLog) {
+      await recordUploadTransaction({ ...scanLog, success: false, errorMessage: errMsg, itemsFound: 0 });
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown extraction error" },
+      { error: errMsg },
       { status: 500 }
     );
   }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { totals, type QuotationInput } from "@/lib/quotation";
 import { linkUsageToQuotation } from "@/lib/aiUsage";
+import { linkUploadToQuotation } from "@/lib/uploadLog";
 import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -175,6 +176,14 @@ export async function POST(req: NextRequest) {
     const usageLogId = Number((body as any).usageLogId);
     if (Number.isFinite(usageLogId) && usageLogId > 0) {
       await linkUsageToQuotation(usageLogId, created.id);
+    }
+
+    // Same deal for the billing ledger: the scan row was written before this
+    // case existed, so the case number can only be attached now. Rows that stay
+    // unlinked are scans the operator discarded.
+    const uploadLogId = Number((body as any).uploadLogId);
+    if (Number.isFinite(uploadLogId) && uploadLogId > 0) {
+      await linkUploadToQuotation(uploadLogId, created.id, created.quotationNo);
     }
 
     return NextResponse.json({ quotation: created });

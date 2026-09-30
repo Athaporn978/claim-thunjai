@@ -350,3 +350,49 @@ model ApiUsageLog {
   @@index([route])
   @@index([quotationId])
 }
+
+/// Billing ledger: one row per document-scan request, written for EVERY upload
+/// regardless of which extraction path ran — including the local pdf-parse path
+/// that never calls Claude, which previously left no trace at all.
+///
+/// This is the table an invoice is built from, so it is deliberately SEPARATE
+/// from ApiUsageLog and holds NO cost, token or USD figures: the report built on
+/// it is shown to the customer being invoiced, and AI cost is our own margin.
+/// Cost stays in ApiUsageLog, which is internal-only.
+model UploadTransactionLog {
+  /// Auto-increment so an invoice run can page through with a stable cursor.
+  id Int @id @default(autoincrement())
+
+  // Who — captured from the signed session cookie at upload time, never from
+  // the client body, so it can't be spoofed by the browser.
+  userEmail  String
+  userName   String
+  branchName String?
+
+  // What was uploaded. One request may carry several files that together form a
+  // single quote (the single-scan path), hence the count alongside the name.
+  fileName  String
+  fileCount Int    @default(1)
+  /// "single" = one case from one or more files; "batch" = one case per file.
+  mode      String @default("single")
+
+  /// Only success == true is billable. A scan that failed cost the customer
+  /// nothing, but is still recorded so a re-scan is visible as its own row.
+  success      Boolean @default(true)
+  errorMessage String?
+  /// How many repair line items the scan produced — 0 on a scan that "worked"
+  /// but read nothing usable.
+  itemsFound   Int     @default(0)
+
+  // The case this scan produced. Both stay null when the operator scanned a
+  // document and never saved it, which is exactly the wastage this table makes
+  // visible.
+  quotationId String?
+  quotationNo String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userEmail])
+  @@index([quotationId])
+}
