@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useLang } from "@/lib/LangContext";
 import { fmtBaht } from "@/lib/quotation";
 import * as XLSX from "xlsx";
+import { AiScanModal } from "@/components/quotation/AiScanModal";
+import { CreationModeBadge } from "@/components/quotation/CreationModeBadge";
 
 type Row = {
   id: string;
   quotationNo: string;
   status: string;
+  creationMode?: string | null;
   customerName: string | null;
   licensePlate: string | null;
   vehicleBrand: string | null;
@@ -49,6 +52,7 @@ export default function QuotationsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkModal, setBulkModal] = useState<BulkModal>(null);
   const [bulkWorking, setBulkWorking] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -302,8 +306,15 @@ export default function QuotationsPage() {
           >
             📥 Export Excel
           </button>
+          <button
+            type="button"
+            onClick={() => setAiModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-[#0071e3] text-[#0071e3] bg-white hover:bg-blue-50 text-sm font-bold transition shadow-sm cursor-pointer"
+          >
+            ✨ {lang === "th" ? "สร้างเคลมใหม่ด้วย AI" : "New claim with AI"}
+          </button>
           <Link href="/quotation/new" className="btn-primary text-sm !py-2.5 !px-6 shadow-md shadow-blue-500/20">
-            + {lang === "th" ? "สร้างใบใหม่" : "New Quotation"}
+            + {lang === "th" ? "สร้างเคลมใหม่" : "New Claim"}
           </Link>
         </div>
       </div>
@@ -521,6 +532,7 @@ export default function QuotationsPage() {
                         <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">🗂️ Archive</span>
                       )}
                       <div className="text-[11px] text-slate-500 font-medium mt-0.5">🕒 {timeStr} น.</div>
+                      <div className="mt-1"><CreationModeBadge mode={r.creationMode} lang={lang} /></div>
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="font-bold text-slate-900">{r.customerName || "—"}</div>
@@ -688,6 +700,16 @@ export default function QuotationsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {aiModalOpen && (
+        <AiScanModal
+          lang={lang}
+          onClose={() => setAiModalOpen(false)}
+          // Drafts are already saved server-side by the time this fires, so the
+          // list just needs to re-fetch to show them.
+          onFinished={() => load()}
+        />
       )}
     </div>
   );

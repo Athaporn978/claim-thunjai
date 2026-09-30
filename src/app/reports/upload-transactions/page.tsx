@@ -64,6 +64,8 @@ export default function UploadTransactionsReport() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +84,7 @@ export default function UploadTransactionsReport() {
   }, [from, to]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setCurrentPage(1); }, [q, from, to, pageSize]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -91,6 +94,12 @@ export default function UploadTransactionsReport() {
         .some((v) => (v || "").toLowerCase().includes(needle))
     );
   }, [rows, q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const exportExcel = () => {
     const data = filtered.map((r, i) => ({
@@ -105,12 +114,11 @@ export default function UploadTransactionsReport() {
       "ผลการอ่าน": r.success ? "สำเร็จ" : "ไม่สำเร็จ",
       "รายการซ่อมที่อ่านได้": r.itemsFound,
       "เลขที่เคส": r.quotationNo || "",
-      "นับเรียกเก็บเงิน": r.success ? 1 : 0,
       "หมายเหตุ": r.errorMessage || "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = [{ wch: 5 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 22 },
-      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Upload Transactions");
     XLSX.writeFile(wb, `upload-transactions-${from}_${to}.xlsx`);
@@ -194,26 +202,25 @@ export default function UploadTransactionsReport() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs font-bold text-slate-500">
+              <tr className="text-center text-xs font-bold text-slate-500">
                 <th className="px-3 py-3">{th ? "วันที่/เวลา" : "Date / Time"}</th>
                 <th className="px-3 py-3">{th ? "ผู้อัปโหลด" : "Uploaded by"}</th>
                 <th className="px-3 py-3">{th ? "ไฟล์" : "File"}</th>
                 <th className="px-3 py-3">{th ? "โหมด" : "Mode"}</th>
-                <th className="px-3 py-3">{th ? "ผล" : "Result"}</th>
+                <th className="px-3 py-3">{th ? "สถานะ" : "Status"}</th>
                 <th className="px-3 py-3">{th ? "เลขที่เคส" : "Case No."}</th>
-                <th className="px-3 py-3 text-center">{th ? "นับเงิน" : "Billable"}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={6} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "กำลังโหลด..." : "Loading..."}
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={6} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "ไม่พบข้อมูลในช่วงเวลาที่เลือก" : "No records in the selected range"}
                 </td></tr>
-              ) : filtered.map((r) => (
+              ) : pagedRows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition">
                   <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs tabular-nums">
                     {fmtDateTime(r.createdAt)}
@@ -258,15 +265,67 @@ export default function UploadTransactionsReport() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {r.success
-                      ? <span className="text-xs font-extrabold text-[#0071e3]">1</span>
-                      : <span className="text-xs font-bold text-slate-300">0</span>}
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500 font-medium">
+              {th
+                ? `แสดง ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, filtered.length)} จากทั้งหมด ${filtered.length} รายการ`
+                : `Showing ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length} items`}
+            </span>
+            <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 shadow-2xs">
+              <span className="text-slate-500 font-bold">{th ? "แสดงหน้าละ:" : "Per page:"}</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-bold transition shadow-2xs cursor-pointer"
+            >
+              ← {th ? "ถอยหลัง" : "Prev"}
+            </button>
+            <div className="flex items-center gap-1 px-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => (
+                  <span key={p} className="flex items-center">
+                    {idx > 0 && p - arr[idx - 1] > 1 && <span className="px-1 text-slate-400 font-bold">…</span>}
+                    <button
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                        currentPage === p
+                          ? "bg-[#0071e3] text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  </span>
+                ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-bold transition shadow-2xs cursor-pointer"
+            >
+              {th ? "ถัดไป" : "Next"} →
+            </button>
+          </div>
         </div>
       </div>
 

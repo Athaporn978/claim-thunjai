@@ -3,9 +3,10 @@ import { use, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/LangContext";
 import { fmtBaht, lineQuoted, lineControlled, lineSaving, totals, type QuotationItemInput } from "@/lib/quotation";
+import { CreationModeBadge } from "@/components/quotation/CreationModeBadge";
 
 type Quotation = {
-  id: string; quotationNo: string; status: string;
+  id: string; quotationNo: string; status: string; creationMode?: string | null;
   customerName: string | null; licensePlate: string | null; vehicleCategory: string | null;
   vehicleBrand: string | null; vehicleModel: string | null; vehicleYear: number | null; chassisNo: string | null; color: string | null; mileage: number | null;
   insurerName: string | null; claimNo: string | null; insVehicleType: string | null; policyNo: string | null;
@@ -610,6 +611,7 @@ export default function QuotationReport({ params }: { params: Promise<{ id: stri
           </div>
           <div className="text-right">
             <div className="font-mono text-sm font-bold text-[var(--navy-900)]">{q.quotationNo}</div>
+            <div className="mt-1 no-print"><CreationModeBadge mode={q.creationMode} lang={lang} /></div>
             <span className={`inline-block mt-1 px-2.5 py-0.5 rounded text-xs font-extrabold ${
               q.status === "approved" || q.status === "finalized"
                 ? "bg-emerald-50 text-emerald-700"

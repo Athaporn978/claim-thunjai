@@ -8,7 +8,8 @@ import { BRANDS } from "@/lib/carCatalog";
 import { totals, fmtBaht, type QuotationInput, type QuotationItemInput, type QuotationPhoto, type ItemType } from "@/lib/quotation";
 import { useSidebar } from "@/lib/SidebarContext";
 import { validateVin } from "@/lib/vinValidation";
-import { compressImageToBase64 } from "@/lib/imageCompress";
+import { CreationModeBadge } from "@/components/quotation/CreationModeBadge";
+import { resolveSessionUser } from "@/lib/aiScan";
 
 const EMPTY: QuotationInput = {
   status: "draft",
@@ -51,258 +52,6 @@ const VEHICLE_CATEGORIES = [
   { v: "pickup", th: "รถกระบะ", en: "Pickup" },
   { v: "van", th: "รถตู้ / MPV", en: "Van / MPV" },
 ];
-
-const MAX_BATCH_FILES = 5;
-
-type ScanPayload = { data: string; mediaType: string; name: string };
-
-type BatchJob = {
-  name: string;
-  status: "pending" | "scanning" | "saving" | "done" | "error";
-  error?: string;
-  quotationId?: string;
-  quotationNo?: string;
-  customerName?: string;
-  itemCount?: number;
-};
-
-function resolveSessionUser() {
-  let s: any = null;
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem("claim_user_session") : null;
-    if (raw) s = JSON.parse(raw);
-  } catch {}
-  const email = s?.email || "somchai@htechnology.com";
-  return {
-    email,
-    name: s?.name || s?.fullName || (email.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี"),
-    branch: s?.branchName || s?.branch || (email.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)"),
-    role: s?.roleName || s?.role?.name || "เจ้าหน้าที่คุมราคา",
-  };
-}
-
-async function fileToScanPayload(file: File): Promise<ScanPayload> {
-  // Images are resized/re-encoded client-side before ever becoming base64 —
-  // uncompressed phone photos (3-8MB each) were blowing past the request
-  // body-size cap once a case had several of them, silently corrupting the
-  // save. PDFs pass through untouched (can't canvas-compress a PDF).
-  if (file.type.startsWith("image/")) {
-    const { data, mediaType } = await compressImageToBase64(file);
-    return { data, mediaType, name: file.name };
-  }
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const res = reader.result as string;
-      resolve(res.split(",")[1] || res);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  return {
-    data: base64,
-    mediaType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
-    name: file.name,
-  };
-}
-
-function buildFormFromExtraction(meta: any, items: any[], files: ScanPayload[]): QuotationInput {
-  let matchedBrandName = meta.vehicleBrand || "";
-  let matchedModelName = meta.vehicleModel || "";
-  let category = "sedan_asia";
-  let size = "B";
-
-  if (matchedBrandName) {
-    const brandObj = BRANDS.find(
-      (b) =>
-        b.name.toLowerCase().includes((matchedBrandName || "").toLowerCase()) ||
-        (matchedBrandName || "").toLowerCase().includes(b.name.toLowerCase())
-    );
-    if (brandObj) {
-      matchedBrandName = brandObj.name;
-      const modelObj = brandObj.models.find(
-        (m) =>
-          m.name.toLowerCase().includes((matchedModelName || "").toLowerCase()) ||
-          (matchedModelName || "").toLowerCase().includes(m.name.toLowerCase())
-      );
-      if (modelObj) {
-        matchedModelName = modelObj.name;
-        category = modelObj.vehicleType || category;
-        size = modelObj.size || size;
-      } else if (brandObj.models.length > 0) {
-        matchedModelName = brandObj.models[0].name;
-        category = brandObj.models[0].vehicleType || category;
-        size = brandObj.models[0].size || size;
-      }
-    }
-  }
-
-  const photos: QuotationPhoto[] = files
-    .filter((f) => f.mediaType.startsWith("image/"))
-    .map((f) => ({
-      url: `data:${f.mediaType};base64,${f.data}`,
-      caption: `ใบเสนอราคา (${f.name})`,
-    }));
-
-  const formattedItems: QuotationItemInput[] = items.map((i: any, index: number) => {
-    const itemType = i.type === "labor" ? "labor" : "part";
-    const quoted = Number(i.unitPrice) || 0;
-    const std = i.standardPrice != null ? Number(i.standardPrice) : null;
-    // std === 0 means "no standard price found" (see extract-quote/route.ts),
-    // not a genuine zero price — must not be treated as cheaper than quoted,
-    // or the controlled price would incorrectly collapse to ฿0.
-    const controlled = (std != null && std > 0 && std < quoted) ? std : quoted;
-    return {
-      type: itemType as ItemType,
-      name: i.name,
-      quotedUnit: quoted,
-      quotedQty: Number(i.qty) || 1,
-      controlledUnit: controlled,
-      controlledQty: Number(i.qty) || 1,
-      standardPrice: std ?? 0,
-      sortOrder: index,
-    };
-  });
-
-  return {
-    ...EMPTY,
-    customerName: meta.customerName || "",
-    licensePlate: meta.licensePlate || "",
-    vehicleCategory: category || "sedan_asia",
-    vehicleBrand: matchedBrandName || meta.vehicleBrand || "",
-    vehicleModel: matchedModelName || meta.vehicleModel || "",
-    vehicleYear: meta.vehicleYear || 2026,
-    vehicleSize: size || "B",
-    chassisNo: meta.chassisNo || "",
-    color: meta.color || "",
-    mileage: meta.mileage || null,
-    insurerName: meta.insurerName || "",
-    claimNo: meta.claimNo || "",
-    policyNo: meta.policyNo || "",
-    policyType: meta.policyType || "ชั้น 1",
-    centerName: meta.centerName || "",
-    centerAddress: meta.centerAddress || "",
-    centerContact: meta.centerContact || "",
-    discountPercent: meta.discountPercent ?? 15,
-    discountAmount: (meta.discountAmount && Number(meta.discountAmount) > 0) ? Number(meta.discountAmount) : 0,
-    includeVat: meta.includeVat ?? true,
-    photos,
-    items: formattedItems,
-  };
-}
-
-function BatchProgressPanel({
-  jobs, running, lang, onClose, onGoToList,
-}: {
-  jobs: BatchJob[]; running: boolean; lang: string;
-  onClose: () => void; onGoToList: () => void;
-}) {
-  const total = jobs.length;
-  const done = jobs.filter((j) => j.status === "done").length;
-  const failed = jobs.filter((j) => j.status === "error").length;
-  const settled = done + failed;
-  const pct = total === 0 ? 0 : Math.round((settled / total) * 100);
-
-  return (
-    <div className="mb-4 bg-white border border-blue-200 rounded-xl p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-base">📚</span>
-          <span className="font-bold text-slate-800 text-sm">
-            {lang === "th" ? "อัปโหลดหลายเคส" : "Batch upload"}
-          </span>
-          <span className="text-xs font-bold text-[#0071e3] bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
-            {lang === "th" ? `สำเร็จแล้ว ${done}/${total}` : `${done}/${total} done`}
-          </span>
-          {failed > 0 && (
-            <span className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
-              {lang === "th" ? `ไม่สำเร็จ ${failed}` : `${failed} failed`}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!running && done > 0 && (
-            <button
-              type="button"
-              onClick={onGoToList}
-              className="px-3.5 py-1.5 rounded-lg bg-[#0071e3] hover:bg-blue-600 text-white text-xs font-bold transition cursor-pointer"
-            >
-              {lang === "th" ? "ไปหน้ารายการเคส →" : "Go to case list →"}
-            </button>
-          )}
-          {!running && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={lang === "th" ? "ปิด" : "Close"}
-              className="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer text-sm font-bold"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="h-1.5 w-full bg-blue-100 rounded-full overflow-hidden mb-3">
-        <div className="h-full bg-[#0071e3] transition-all duration-500 rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-
-      <ul className="space-y-1.5">
-        {jobs.map((j, i) => (
-          <li
-            key={`${j.name}-${i}`}
-            className="flex flex-wrap items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"
-          >
-            <span className="font-mono text-slate-400 shrink-0">{i + 1}.</span>
-            <span className="font-semibold text-slate-700 truncate max-w-[220px]" title={j.name}>{j.name}</span>
-
-            {j.status === "pending" && (
-              <span className="ml-auto text-slate-400 font-medium">{lang === "th" ? "รอคิว" : "Queued"}</span>
-            )}
-            {(j.status === "scanning" || j.status === "saving") && (
-              <span className="ml-auto flex items-center gap-1.5 text-[#0071e3] font-bold">
-                <span className="w-3 h-3 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
-                {j.status === "scanning"
-                  ? (lang === "th" ? "AI กำลังอ่าน..." : "Scanning...")
-                  : (lang === "th" ? "กำลังบันทึกเคส..." : "Saving...")}
-              </span>
-            )}
-            {j.status === "done" && (
-              <>
-                <span className="text-slate-500 truncate">
-                  {j.customerName || (lang === "th" ? "ไม่พบชื่อลูกค้า" : "No customer name")}
-                  {" · "}
-                  {lang === "th" ? `${j.itemCount} รายการ` : `${j.itemCount} items`}
-                </span>
-                <a
-                  href={`/quotation/new?id=${j.quotationId}`}
-                  className="ml-auto flex items-center gap-1.5 text-emerald-700 font-bold hover:underline shrink-0"
-                >
-                  <span>✅</span>
-                  <span>{j.quotationNo || (lang === "th" ? "เปิดเคส" : "Open case")}</span>
-                </a>
-              </>
-            )}
-            {j.status === "error" && (
-              <span className="ml-auto flex items-center gap-1.5 text-red-700 font-bold text-right">
-                <span>❌</span>
-                <span className="font-semibold">{j.error}</span>
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {!running && failed > 0 && (
-        <p className="mt-2.5 text-[11px] text-slate-500">
-          {lang === "th"
-            ? "เคสที่ไม่สำเร็จไม่ถูกบันทึก สามารถอัปโหลดไฟล์นั้นใหม่อีกครั้งได้"
-            : "Failed files were not saved — you can re-upload them."}
-        </p>
-      )}
-    </div>
-  );
-}
 
 function VinField({ value, onChange, make, year, lang }: {
   value: string | null | undefined; onChange: (v: string) => void;
@@ -371,11 +120,6 @@ function Wizard() {
   const sp = useSearchParams();
   const editId = sp.get("id");
   const [form, setForm] = useState<QuotationInput>(EMPTY);
-  // Cost row for the AI scan that populated this form, linked to the quotation
-  // on first save. A ref, not state: it must never trigger a re-render.
-  const scanUsageLogId = useRef<number | null>(null);
-  // Billing-ledger row for that same scan, linked to the case on first save.
-  const scanUploadLogId = useRef<number | null>(null);
   const [insurerCustom, setInsurerCustom] = useState(false);
   const [centerCustom, setCenterCustom] = useState(false);
   const [step, setStep] = useState(0);
@@ -383,16 +127,8 @@ function Wizard() {
   const [saving, setSaving] = useState(false);
   const [id, setId] = useState<string | null>(editId);
   const [leaveModal, setLeaveModal] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState<number>(0);
-  const [scanStepText, setScanStepText] = useState<string>("");
-  const [duplicateNoticeMsg, setDuplicateNoticeMsg] = useState<string | null>(null);
-  const [pendingReuploadData, setPendingReuploadData] = useState<{ extractedItems: QuotationItemInput[]; meta: any } | null>(null);
-  const [uploadedFileSignatures, setUploadedFileSignatures] = useState<string[]>([]);
   const [prefillNote, setPrefillNote] = useState<string>("");
   const [saveToast, setSaveToast] = useState<{ msg: string } | null>(null);
-  const [batchJobs, setBatchJobs] = useState<BatchJob[] | null>(null);
-  const [batchRunning, setBatchRunning] = useState(false);
   const skipGuard = useRef(false);
 
   const resetWizardForm = useCallback(() => {
@@ -401,12 +137,6 @@ function Wizard() {
     setId(null);
     setStep(0);
     setPrefillNote("");
-    setUploadedFileSignatures([]);
-    setPendingReuploadData(null);
-    setDuplicateNoticeMsg(null);
-    // Clear too, or a fresh case would inherit the previous scan's cost row.
-    scanUsageLogId.current = null;
-    scanUploadLogId.current = null;
   }, []);
 
   // Reset form when opening a new quotation
@@ -448,16 +178,14 @@ function Wizard() {
   // beforeunload guard for full page reload/close
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      // batchRunning too: the batch loop lives in this page, so leaving mid-run
-      // abandons every file that hasn't been saved yet.
-      if ((dirty || batchRunning) && !skipGuard.current) {
+      if (dirty && !skipGuard.current) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty, batchRunning]);
+  }, [dirty]);
 
   // Intercept Next.js client-side link clicks (Header, Navbar, Logo) when form is dirty
   useEffect(() => {
@@ -517,10 +245,6 @@ function Wizard() {
         createdByEmail: userEmail,
         branchName: userBranch,
         status: (opts?.finalize || opts?.thenView) ? "completed" : (form.status || "draft"),
-        // Only meaningful on the first save (POST) of an AI-scanned case; the
-        // server ignores it otherwise.
-        usageLogId: scanUsageLogId.current,
-        uploadLogId: scanUploadLogId.current,
         // For EDITED audit log on PUT
         _editorName: userName,
         _editorRole: userRole,
@@ -566,240 +290,7 @@ function Wizard() {
     else { skipGuard.current = true; router.push("/quotations"); }
   };
 
-  const handleAiScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // Instant Pre-scan Reset: Wipe form and state clean immediately on new upload start
-    setForm(EMPTY);
-    setDirty(false);
-    setPrefillNote("");
-    setUploadedFileSignatures([]);
-    setPendingReuploadData(null);
-    setDuplicateNoticeMsg(null);
-
-    setScanning(true);
-    setScanProgress(15);
-    setScanStepText(lang === "th" ? "กำลังอ่านไฟล์เอกสารใบเสนอราคา..." : "Reading quote document file...");
-    setStepError("");
-
-    // Live progress timer animation
-    const progressTimer = setInterval(() => {
-      setScanProgress((prev) => {
-        if (prev >= 92) return 92;
-        const next = prev + Math.floor(Math.random() * 10) + 5;
-        if (next < 35) {
-          setScanStepText(lang === "th" ? "กำลังวิเคราะห์โครงสร้างเอกสารด้วย AI..." : "Scanning document structure with AI...");
-        } else if (next < 65) {
-          setScanStepText(lang === "th" ? "กำลังสกัดข้อมูลลูกค้า รถยนต์ และบริษัทประกันภัย..." : "Extracting customer, vehicle & insurance info...");
-        } else if (next < 85) {
-          setScanStepText(lang === "th" ? "กำลังอ่านรายการซ่อมและคำนวณเปรียบเทียบราคากลางอู่กลาง..." : "Extracting repair items & looking up standard prices...");
-        } else {
-          setScanStepText(lang === "th" ? "กำลัง Auto-fill ข้อมูลเข้าสู่ฟอร์มทั้ง 6 ขั้นตอน..." : "Auto-filling data into all 6 form steps...");
-        }
-        return next > 92 ? 92 : next;
-      });
-    }, 350);
-
-    try {
-      const fileArray: ScanPayload[] = [];
-      for (let i = 0; i < files.length; i++) {
-        fileArray.push(await fileToScanPayload(files[i]));
-      }
-
-      const res = await fetch("/api/extract-quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: fileArray }),
-      });
-
-      const data = await res.json();
-      clearInterval(progressTimer);
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Extraction failed");
-      }
-
-      setScanProgress(100);
-      setScanStepText(lang === "th" ? "สแกนสำเร็จ 100%! กำลังนำข้อมูลเข้าฟอร์ม..." : "Scan 100% complete! Populating form...");
-
-      const items = data.items || [];
-      const meta = data.metadata || {};
-      // Carried through to the save so the scan's AI cost can be attributed to
-      // the quotation it produced (see linkUsageToQuotation).
-      scanUsageLogId.current = typeof data.usageLogId === "number" ? data.usageLogId : null;
-      scanUploadLogId.current = typeof data.uploadLogId === "number" ? data.uploadLogId : null;
-
-      const nextForm = buildFormFromExtraction(meta, items, fileArray);
-      const formattedItems = nextForm.items || [];
-
-      // Short delay so user sees 100% complete bar
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      setForm(nextForm);
-
-      setDirty(true);
-      setPrefillNote(
-        lang === "th"
-          ? `✨ สแกนเอกสาร (${files[0].name}) สำเร็จ 100%! นำข้อมูล Auto-fill เข้าครบทั้ง 6 ขั้นตอนแล้ว (${formattedItems.length} รายการซ่อม)`
-          : `✨ Scanned document (${files[0].name}) 100% successfully! Auto-filled all 6 steps (${formattedItems.length} items)`
-      );
-    } catch (err: any) {
-      console.error("AI scan upload error:", err);
-      clearInterval(progressTimer);
-      setStepError(
-        err?.message ||
-          (lang === "th"
-            ? "สแกนเอกสารไม่สำเร็จ กรุณาลองใหม่หรือกรอกข้อมูลด้วยตนเอง"
-            : "Document scan failed. Please try again or enter data manually.")
-      );
-    } finally {
-      setScanning(false);
-      setScanProgress(0);
-      setScanStepText("");
-      e.target.value = "";
-    }
-  };
-
-  // Batch scan: each file becomes its OWN draft case (unlike the single-scan
-  // path above, where several files are pages of one quote). Files are handled
-  // one at a time so each extraction gets its own fresh model context, and one
-  // bad file can't take the rest of the batch down with it.
-  const handleBatchScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (picked.length === 0) return;
-
-    const batch = picked.slice(0, MAX_BATCH_FILES);
-    const skipped = picked.length - batch.length;
-
-    setStepError("");
-    setBatchRunning(true);
-    setBatchJobs(batch.map((f) => ({ name: f.name, status: "pending" as const })));
-
-    const patch = (idx: number, p: Partial<BatchJob>) =>
-      setBatchJobs((prev) => (prev ? prev.map((j, i) => (i === idx ? { ...j, ...p } : j)) : prev));
-
-    const u = resolveSessionUser();
-
-    for (let i = 0; i < batch.length; i++) {
-      try {
-        patch(i, { status: "scanning" });
-        const payload = await fileToScanPayload(batch[i]);
-
-        const res = await fetch("/api/extract-quote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ files: [payload], mode: "batch" }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || "อ่านเอกสารไม่สำเร็จ");
-
-        patch(i, { status: "saving" });
-        const draft = buildFormFromExtraction(data.metadata || {}, data.items || [], [payload]);
-
-        const saveRes = await fetch("/api/quotations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...draft,
-            status: "draft",
-            createdByName: u.name,
-            createdByEmail: u.email,
-            branchName: u.branch,
-            usageLogId: typeof data.usageLogId === "number" ? data.usageLogId : null,
-            uploadLogId: typeof data.uploadLogId === "number" ? data.uploadLogId : null,
-          }),
-        });
-        const saved = await saveRes.json();
-        if (!saveRes.ok || !saved.quotation?.id) throw new Error(saved.error || "บันทึกเคสไม่สำเร็จ");
-
-        patch(i, {
-          status: "done",
-          quotationId: saved.quotation.id,
-          quotationNo: saved.quotation.quotationNo,
-          customerName: draft.customerName || "",
-          itemCount: draft.items?.length || 0,
-        });
-      } catch (err: any) {
-        console.error(`Batch scan failed for ${batch[i].name}:`, err);
-        patch(i, {
-          status: "error",
-          error: err?.message || (lang === "th" ? "ไม่สำเร็จ" : "Failed"),
-        });
-      }
-    }
-
-    setBatchRunning(false);
-    if (skipped > 0) {
-      setStepError(
-        lang === "th"
-          ? `เลือกมา ${picked.length} ไฟล์ ระบบประมวลผลได้สูงสุด ${MAX_BATCH_FILES} ไฟล์ต่อครั้ง (ข้าม ${skipped} ไฟล์สุดท้าย)`
-          : `Selected ${picked.length} files; max ${MAX_BATCH_FILES} per run (skipped the last ${skipped}).`
-      );
-    }
-  };
-
   const [stepError, setStepError] = useState<string>("");
-
-  const applyReuploadOption = (option: "replace" | "append" | "cancel") => {
-    if (option === "cancel" || !pendingReuploadData) {
-      setPendingReuploadData(null);
-      return;
-    }
-
-    const { extractedItems, meta } = pendingReuploadData;
-    let matchedBrandName = meta.vehicleBrand || "";
-    let matchedModelName = meta.vehicleModel || "";
-
-    if (matchedBrandName) {
-      const brandObj = BRANDS.find((b) =>
-        b.name.toLowerCase().includes((matchedBrandName || "").toLowerCase()) ||
-        (matchedBrandName || "").toLowerCase().includes(b.name.toLowerCase())
-      );
-      if (brandObj) {
-        matchedBrandName = brandObj.name;
-        const modelObj = brandObj.models.find((m) =>
-          m.name.toLowerCase().includes((matchedModelName || "").toLowerCase()) ||
-          (matchedModelName || "").toLowerCase().includes(m.name.toLowerCase())
-        );
-        if (modelObj) {
-          matchedModelName = modelObj.name;
-        } else if (brandObj.models.length > 0) {
-          matchedModelName = brandObj.models[0].name;
-        }
-      }
-    }
-
-    if (option === "replace") {
-      setForm({
-        ...EMPTY,
-        customerName: meta.customerName || "",
-        licensePlate: meta.licensePlate || "",
-        vehicleBrand: matchedBrandName || "",
-        vehicleModel: matchedModelName || "",
-        vehicleYear: meta.vehicleYear || 2026,
-        chassisNo: meta.chassisNo || "",
-        color: meta.color || "",
-        mileage: meta.mileage || null,
-        insurerName: meta.insurerName || "",
-        claimNo: meta.claimNo || "",
-        policyNo: meta.policyNo || "",
-        policyType: meta.policyType || "ชั้น 1",
-        centerName: meta.centerName || "",
-        centerAddress: meta.centerAddress || "",
-        centerContact: meta.centerContact || "",
-        items: extractedItems,
-      });
-    } else if (option === "append") {
-      setForm((prev) => ({
-        ...prev,
-        items: [...prev.items, ...extractedItems],
-      }));
-    }
-
-    setPendingReuploadData(null);
-  };
 
   const validateStep = (currentStep: number): string | null => {
     if (currentStep === 0) {
@@ -862,9 +353,12 @@ function Wizard() {
               {isCollapsed ? (lang === "th" ? "⇉ แสดงเมนู" : "⇉ Show Sidebar") : (lang === "th" ? "⇇ ย่อเมนู (ขยายตารางเต็มจอ)" : "⇇ Focus Mode")}
             </button>
           </div>
-          <h1 className="text-2xl font-bold text-[var(--navy-900)]">
-            {lang === "th" ? "ใบเสนอราคาซ่อมรถยนต์" : "Repair Quotation"}
-            {form.quotationNo && <span className="ml-2 text-sm font-mono text-slate-400">{form.quotationNo}</span>}
+          <h1 className="text-2xl font-bold text-[var(--navy-900)] flex flex-wrap items-center gap-2">
+            <span>{lang === "th" ? "ใบเสนอราคาซ่อมรถยนต์" : "Repair Quotation"}</span>
+            {form.quotationNo && <span className="text-sm font-mono text-slate-400">{form.quotationNo}</span>}
+            {/* Gated on quotationNo, not id: id comes from the URL immediately,
+                so the badge would flash "manual" until the case finishes loading. */}
+            {form.quotationNo && <CreationModeBadge mode={form.creationMode} lang={lang} />}
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -875,107 +369,6 @@ function Wizard() {
         </div>
       </div>
 
-      {/* AI Quote Auto-Scan Banner (Clean White Card matching form below) */}
-      <div className="mb-6 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-slate-800">
-                {lang === "th" ? "สแกนใบเสนอราคาอัตโนมัติด้วย AI" : "AI Automatic Quote Scanner"}
-              </h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0071e3] border border-blue-100 text-[11px] font-extrabold uppercase tracking-wide">
-                Full 6-Step Auto-Fill
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {lang === "th"
-                ? "อัปโหลดไฟล์ PDF หรือรูปถ่ายใบเสนอราคา ระบบ AI จะอ่านและกรอกข้อมูลอัตโนมัติทั้ง 6 ขั้นตอน (ลูกค้า, ประกัน, ศูนย์ซ่อม, ภาพ, ค่าแรง, ค่าอะไหล่)"
-                : "Upload PDF or photo of repair quote to automatically fill all 6 steps."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {dirty && (
-            <button
-              type="button"
-              onClick={resetWizardForm}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition cursor-pointer shadow-md"
-              title={lang === "th" ? "ล้างข้อมูลฟอร์มทั้งหมดเพื่อเริ่มสแกนใหม่" : "Reset form data for new scan"}
-            >
-              <span>🔄</span>
-              <span>{lang === "th" ? "ล้างข้อมูล / เริ่มสแกนใหม่" : "Reset / New Scan"}</span>
-            </button>
-          )}
-          <label
-            title={dirty ? (lang === "th" ? "กรุณากด 'ล้างข้อมูล / เริ่มสแกนใหม่' ก่อนสแกนไฟล์ใหม่" : "Please reset form before scanning a new file") : undefined}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-md ${
-              dirty || scanning || batchRunning
-                ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
-                : "bg-[#0071e3] hover:bg-blue-600 text-white cursor-pointer"
-            }`}
-          >
-            {scanning ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>{lang === "th" ? "กำลังสแกนและกรอกข้อมูล..." : "Scanning & Auto-filling..."}</span>
-              </>
-            ) : (
-              <>
-                <span>📁</span>
-                <span>{lang === "th" ? "เลือกไฟล์ PDF / รูปภาพเพื่อสแกน" : "Select PDF / Images to Scan"}</span>
-              </>
-            )}
-            <input
-              type="file"
-              accept=".pdf,image/*"
-              multiple
-              onChange={handleAiScanUpload}
-              disabled={scanning || dirty || batchRunning}
-              className="hidden"
-            />
-          </label>
-
-          <label
-            title={
-              lang === "th"
-                ? `อัปโหลดหลายไฟล์ สูงสุด ${MAX_BATCH_FILES} ไฟล์ — แต่ละไฟล์จะถูกสร้างเป็นเคสแยกกัน`
-                : `Upload up to ${MAX_BATCH_FILES} files — each becomes its own case`
-            }
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-md border-2 ${
-              scanning || batchRunning
-                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
-                : "bg-white text-[#0071e3] border-[#0071e3] hover:bg-blue-50 cursor-pointer"
-            }`}
-          >
-            {batchRunning ? (
-              <>
-                <span className="w-4 h-4 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
-                <span>{lang === "th" ? "กำลังสร้างหลายเคส..." : "Creating cases..."}</span>
-              </>
-            ) : (
-              <>
-                <span>📚</span>
-                <span>
-                  {lang === "th"
-                    ? `อัปโหลดหลายเคส (สูงสุด ${MAX_BATCH_FILES})`
-                    : `Batch upload (max ${MAX_BATCH_FILES})`}
-                </span>
-              </>
-            )}
-            <input
-              type="file"
-              accept=".pdf,image/*"
-              multiple
-              onChange={handleBatchScanUpload}
-              disabled={scanning || batchRunning}
-              className="hidden"
-            />
-          </label>
-        </div>
-      </div>
-
-      {batchJobs && <BatchProgressPanel jobs={batchJobs} running={batchRunning} lang={lang} onClose={() => setBatchJobs(null)} onGoToList={() => { skipGuard.current = true; router.push("/quotations"); }} />}
 
       {prefillNote && (
         <div className="mb-4 bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 text-sm text-emerald-900 flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -1411,64 +804,6 @@ function Wizard() {
               >
                 {lang === "th" ? "ออกจากหน้านี้ (ไม่บันทึก)" : "Leave page (Discard)"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* AI Document Scanning Progress Overlay Modal */}
-      {scanning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 sm:p-8 border border-sky-100 animate-in zoom-in-95 duration-200">
-            {/* Header with spinning loader & % indicator */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#0071e3] text-white flex items-center justify-center text-xl shadow-md">
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">
-                    {lang === "th" ? "กำลังประมวลผลสแกนเอกสารด้วย AI" : "AI Document Processing"}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">Auto-filling 6 Form Steps</p>
-                </div>
-              </div>
-              <div className="text-3xl font-extrabold text-[#0071e3] font-mono">
-                {scanProgress}%
-              </div>
-            </div>
-
-            {/* Progress Bar Track */}
-            <div className="w-full bg-slate-100 rounded-full h-4 mb-3 p-0.5 overflow-hidden border border-slate-200 shadow-inner">
-              <div
-                className="bg-gradient-to-r from-[#0071e3] via-blue-500 to-indigo-600 h-full rounded-full transition-all duration-300 ease-out shadow-md"
-                style={{ width: `${Math.max(5, Math.min(100, scanProgress))}%` }}
-              />
-            </div>
-
-            {/* Live Step Status Message */}
-            <div className="text-xs font-semibold text-[#0071e3] text-center mb-6 bg-sky-50 py-2.5 px-3 rounded-xl border border-sky-200">
-              {scanStepText || (lang === "th" ? "กำลังประมวลผล..." : "Processing...")}
-            </div>
-
-            {/* Required Warnings */}
-            <div className="space-y-2.5">
-              <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs font-semibold">
-                <span className="text-base shrink-0">🛑</span>
-                <span className="leading-relaxed">
-                  {lang === "th"
-                    ? "ห้ามปิดหน้านี้ขณะระบบกำลังสแกนและประมวลผลเอกสาร"
-                    : "Do not close this page while scanning and processing the document."}
-                </span>
-              </div>
-
-              <div className="bg-sky-50 border border-sky-300 rounded-2xl p-3 text-xs text-sky-950 flex items-start gap-2.5 shadow-2xs font-semibold">
-                <span className="text-base shrink-0">⚠️</span>
-                <span className="leading-relaxed">
-                  {lang === "th"
-                    ? "เอกสารนี้ใช้ AI ในการอ่านค่า อาจเกิดข้อผิดพลาดได้ กรุณาตรวจสอบความถูกต้องของข้อมูลทุกครั้งก่อนบันทึก"
-                    : "This document uses AI for data extraction and errors may occur. Please verify all information before saving."}
-                </span>
-              </div>
             </div>
           </div>
         </div>

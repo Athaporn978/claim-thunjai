@@ -184,7 +184,10 @@ model Quotation {
   approvedBy String?
   startedAt  DateTime?
   submittedAt DateTime?
-  creationMode String? @default("ai_extract") // "ai_extract" | "manual"
+  /// How the case was created. Defaults to "manual" because a case that never
+  /// says otherwise was typed by hand — the old "ai_extract" default silently
+  /// labelled every hand-typed case as AI-generated.
+  creationMode String? @default("manual") // "ai_extract" | "manual"
   processingTimeSec Int?
 
   createdByName  String?

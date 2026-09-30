@@ -21,6 +21,8 @@ export type QuotationItemInput = {
 export type QuotationInput = {
   id?: string;
   quotationNo?: string;
+  /** "ai_extract" | "manual" — how the case was created. */
+  creationMode?: string | null;
   status?: string;
   // customer
   customerName?: string | null;

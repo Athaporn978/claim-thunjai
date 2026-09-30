@@ -42,6 +42,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ⏳ **การใช้ Smart Flexible Item Parser (ปรับปรุงตัวอ่าน PDF ภาษาไทย)**:
   - *สถานะ*: ⏳ **รอผู้ใช้ทดสอบและยืนยันผล (Pending User Verification)**
   - *รายละเอียด*: ปรับปรุงการถอดข้อความภาษาไทย (ชื่อลูกค้า, ศูนย์ซ่อม, ยี่ห้อ/รุ่น) และถอดตารางรายการซ่อมที่ยืดหยุ่นโดยไม่ใช้ Mock (ยังต้องรอผู้ใช้อนุมัติและทดสอบจริง)
+- ❌ **ข้อมูล Deploy ใน AGENTS.md เดิมผิด 4 จุด — เคยทำให้ deploy ล้มเหลวซ้ำๆ**:
+  - *ผลลัพธ์*: ❌ **ล้มเหลว (Failed)** จนกว่าจะแก้ครบทั้ง 4 จุด
+  - *สาเหตุ*: (1) SSH key `thunjaipos_tunnel` → Permission denied ต้องใช้ `vps503_root` (2) PM2 ID 6 เป็นคนละโปรเจกต์แล้ว (`chat-thunjai`) ตัวจริงคือ ID 2 (3) รันด้วย root ติด `dubious ownership` เพราะ repo เป็นของ user `deploy` (4) ไฟล์ DB production คือ `prisma/demo.db` ไม่ใช่ `dev.db`
+  - *กฎเหล็ก*: **ก่อน deploy ทุกครั้งให้ยืนยันของจริงบนเซิร์ฟเวอร์ก่อน** (`pm2 list` ในนาม `deploy`, `ss -tlnp`, `grep DATABASE_URL .env`) อย่าเชื่อค่าในเอกสารอย่างเดียว และถ้าพบว่าต่างจากเอกสาร **ให้อัปเดตเอกสารทันที**
+- ✅ **แยกตาราง Log ค่าใช้จ่ายภายใน ออกจาก Log ที่ลูกค้าเห็น**:
+  - *ผลลัพธ์*: ✅ **สำเร็จ (Passed)**
+  - *รายละเอียด*: `ApiUsageLog` (ต้นทุน AI/token/USD) = ภายในเท่านั้น ห้ามโชว์ลูกค้า / `UploadTransactionLog` (ใคร-เมื่อไหร่-ไฟล์ไหน-เคสอะไร) = ใช้ออก invoice ลูกค้าเห็นได้
+  - *กฎเหล็ก*: **ห้ามเพิ่มฟิลด์ต้นทุน/USD/token เข้า `UploadTransactionLog` หรือหน้า `/reports/upload-transactions` เด็ดขาด** เพราะรายงานนี้ส่งให้ลูกค้าที่ถูกเรียกเก็บเงินดู ถ้าโชว์ต้นทุนจะเปิดเผย margin ของบริษัท
 
 # Core Business Logic: Price Matching (Logic การจับคู่ราคาค่าแรง & อะไหล่)
 - **ค่าแรง (Labor) — มีการ match อัตโนมัติกับราคากลาง**: ใช้ `src/app/api/extract-quote/route.ts` (เริ่มบรรทัด ~314)
@@ -69,14 +77,26 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Main Branch**: `main`
 
 # VPS Production & Deployment Specification
-- **VPS Server IP**: `103.76.181.143` (User: `root`)
-- **SSH Key**: `~/.ssh/thunjaipos_tunnel`
+> ⚠️ ข้อมูลชุดนี้ตรวจสอบจริงบนเซิร์ฟเวอร์แล้วเมื่อ 30 ก.ย. 2569 — ค่าเดิม 4 จุด (SSH key, PM2 ID, user, ไฟล์ DB) **ผิดทั้งหมด** ดูหัวข้อบทเรียนท้ายไฟล์
+
+- **VPS Server IP**: `103.76.181.143` (SSH เข้าด้วย user `root`)
+- **SSH Key**: `~/.ssh/vps503_root` ← **ห้ามใช้ `~/.ssh/thunjaipos_tunnel` (Permission denied)**
 - **Directory Path**: `/var/www/demo-claim`
-- **PM2 Process Name / ID**: `demo-claim` (ID: 6)
+- **เจ้าของไฟล์ / user ที่รันแอปจริง**: `deploy` (**ไม่ใช่ `root`**)
+- **PM2 Process Name / ID**: `demo-claim` (ID: **2**) — ID 6 ปัจจุบันคือ `chat-thunjai` คนละโปรเจกต์
+- **Port**: `3125` (nginx reverse proxy → `127.0.0.1:3125`)
+- **ไฟล์ฐานข้อมูล Production**: `prisma/demo.db` (~426MB) — **ไม่ใช่ `dev.db`** (`dev.db` คือของเครื่อง Local)
 - **Live Production URL**: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
+
 - **Zero-Downtime Deployment Command**:
   ```bash
-  ssh -i ~/.ssh/thunjaipos_tunnel root@103.76.181.143 "cd /var/www/demo-claim && git fetch origin main && git reset --hard origin/main && npm install && npx prisma generate && npx prisma db push && npm run build && pm2 restart demo-claim"
+  ssh -i ~/.ssh/vps503_root root@103.76.181.143 "su - deploy -c 'cd /var/www/demo-claim && git fetch origin main && git reset --hard origin/main && npm install && npx prisma generate && npx prisma db push && npm run build && pm2 restart demo-claim'"
+  ```
+  **ต้องครอบด้วย `su - deploy -c '...'` เสมอ** ถ้ารันตรงด้วย root จะเจอ `fatal: detected dubious ownership` และถ้าฝืนข้ามไป ไฟล์ `node_modules/` กับ `.next/` จะกลายเป็นของ root ทำให้แอปที่รันด้วย user `deploy` พังทันที
+
+- **Backup ฐานข้อมูลก่อน `prisma db push` ทุกครั้ง** (บังคับ เมื่อมีการแก้ schema):
+  ```bash
+  ssh -i ~/.ssh/vps503_root root@103.76.181.143 "cd /var/www/demo-claim/prisma && cp demo.db demo.db.bak-\$(date +%Y%m%d-%H%M%S)"
   ```
 
 # Completed Tasks Log (บันทึกผลงานที่ดำเนินการเสร็จสิ้นเรียบร้อยแล้ว)
@@ -115,4 +135,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
     - แทนที่ไอคอนโลโก้ตัวอักษร (SVG รูปสามเหลี่ยม) ด้วยไฟล์ภาพจริง `public/logo/Htech_logo.webp` ใน 4 จุด: `Header.tsx`, `Sidebar.tsx`, `login/page.tsx`, ใบรายงานพิมพ์ `quotations/[id]/page.tsx`
     - **สิ่งที่จงใจไม่แตะ (Out of Scope)**: ชื่อ Product "ClaimThunJai/ClaimThunJai AI" (ยังคงไว้ เพราะเป็นชื่อสินค้า ไม่ใช่ชื่อบริษัท), ไฟล์ `scripts/generate_proposal_docx.py` และ `scripts/Claude_generate_proposal.py` (เป็นเอกสารเสนอราคาที่ TechThunJai ใช้ติดต่อขายให้ H Technology เอง — สลับข้อมูลผิดจะทำให้เอกสารความหมายผิด), URL Production `demo-claim.techthunjai.com` ในหัวข้อ VPS (เป็นโดเมน Infra จริงที่ยังไม่ได้เปลี่ยน DNS)
     - **บทเรียน**: ต้องตรวจข้อมูลจริงในฐานข้อมูล (`dev.db` ที่ root ของโปรเจกต์ ไม่ใช่ `prisma/dev.db` ที่เป็นไฟล์ว่างเก่า) ควบคู่กับโค้ดเสมอเวลา rebrand เพราะ RBAC logic เทียบอีเมลกับค่าที่บันทึกจริงใน DB ถ้าแก้แค่โค้ดแต่ไม่แก้ข้อมูล จะทำให้สิทธิ์แอดมิน/การกรองสาขาใช้งานไม่ได้ทันที
+12. **📚 Batch Upload (อัปโหลดหลายเคสพร้อมกัน สูงสุด 5 ไฟล์)**:
+    - ปุ่ม *"📚 อัปโหลดหลายเคส (สูงสุด 5)"* ในหน้า `/quotation/new` — **1 ไฟล์ = 1 เคส** (ต่างจากปุ่มสแกนเดิมที่ หลายไฟล์ = 1 เคส ซึ่งยังทำงานเหมือนเดิมไม่กระทบ)
+    - ประมวลผล **ทีละไฟล์ (sequential)** เพื่อให้แต่ละไฟล์ได้ context ของ AI ใหม่แยกกัน และไฟล์ที่พังไฟล์เดียวจะไม่ทำให้ทั้ง batch หยุด
+    - แสดง progress `สำเร็จแล้ว x/5` แบบสด + สถานะรายไฟล์ (รอคิว / AI กำลังอ่าน / กำลังบันทึก / ✅ เลขเคส / ❌ สาเหตุที่ล้มเหลว) เลือกเกิน 5 ไฟล์จะทำ 5 ไฟล์แรกแล้วแจ้งว่าข้ามกี่ไฟล์
+    - เพิ่ม guard กันปิดแท็บระหว่าง batch กำลังรัน (เดิม `beforeunload` เช็คแค่ `dirty` ซึ่ง batch ไม่ได้ตั้ง ทำให้ปิดแท็บแล้วไฟล์ที่เหลือหายเงียบ)
+    - จำนวนสูงสุดคุมด้วยค่าคงที่ `MAX_BATCH_FILES` ตัวเดียวใน `src/app/quotation/new/page.tsx` ถ้าจะปรับเป็น 10 แก้บรรทัดเดียว
+13. **🧾 Upload Audit Log — สำหรับออก Invoice เรียกเก็บเงินแบบ Per-Transaction**:
+    - **ปัญหาเดิมที่ร้ายแรง**: `extract-quote` จะลอง `pdf-parse` (อ่าน text ในเครื่อง) ก่อน **ถ้าอ่านเจอรายการจะไม่เรียก Claude API เลย → ไม่มี log แม้แต่แถวเดียว** ทำให้ออกใบแจ้งหนี้ตามจำนวน transaction จริงไม่ได้ และ `recordUsage` เดิมก็ไม่เคยส่ง `userEmail`/`branchName` เข้าไป (เป็น null ทั้งหมด)
+    - สร้างตาราง **`UploadTransactionLog`** เขียน **1 แถวต่อ 1 ครั้งที่เรียกสแกน ครอบคลุมครบทั้ง 3 เส้นทาง**: pdf-parse สำเร็จ / Claude สำเร็จ / ล้มเหลว
+    - เก็บ: ชื่อผู้อัปโหลด, อีเมล, สาขา, วันเวลา, ชื่อไฟล์, จำนวนไฟล์, โหมด (single/batch), ผลสำเร็จ, สาเหตุที่ล้มเหลว, จำนวนรายการที่อ่านได้, เลขที่เคสที่ได้
+    - **ดึงตัวตนผู้ใช้จาก session cookie ที่เซ็นแล้ว (`getSession()`) ไม่ใช่จาก request body** → พนักงานปลอมชื่อคนอื่นผ่าน browser ไม่ได้
+    - **หน่วยที่นับเงิน = `success === true`** (อ่านสำเร็จ) ส่วนไฟล์เสียที่อ่านไม่ได้ยังบันทึกไว้แต่ไม่นับเงิน เพื่อให้เห็นว่ามีการสแกนซ้ำ / เคสที่สแกนสำเร็จแต่ไม่ได้บันทึกเคส (`quotationId` ว่าง) จะนับเงินและขึ้นในการ์ด *"สแกนแล้วไม่ได้บันทึกเคส"*
+    - หน้ารายงาน **`/reports/upload-transactions`** (เมนู *"บันทึกการอัปโหลด"*) — **ทุกคนที่ล็อกอินเห็นได้ เพื่อความโปร่งใส** มีตัวกรองช่วงวันที่ (เดือนนี้/เดือนที่แล้ว), ค้นหา, Export Excel (มีคอลัมน์ *"นับเรียกเก็บเงิน"* 1/0) และการ์ดสรุป 4 ใบ
+    - **สิ่งที่จงใจไม่ทำ**: ไม่ผูกตารางนี้เข้ากับ `ApiUsageLog` และ **ไม่มีฟิลด์ต้นทุน/USD/token ใดๆ ทั้งในตารางและหน้าเว็บ** เพราะรายงานนี้ให้ลูกค้าที่ถูกเรียกเก็บเงินดู (ดูกฎเหล็กในหัวข้อ Solution History Log)
 
