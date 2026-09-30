@@ -52,8 +52,6 @@ export async function GET(req: NextRequest) {
         total: rows.length,
         billable,
         failed: rows.length - billable,
-        // Billable scans that were never saved as a case — the wastage figure.
-        discarded: rows.filter((r) => r.success && !r.quotationId).length,
         // Raw page total for the operator's own analysis — no cost implied.
         totalPages: rows.reduce((sum, r) => sum + (r.pageCount || 0), 0),
       },

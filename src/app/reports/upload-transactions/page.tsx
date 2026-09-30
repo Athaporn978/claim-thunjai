@@ -20,7 +20,7 @@ type Row = {
   createdAt: string;
 };
 
-type Summary = { total: number; billable: number; failed: number; discarded: number; totalPages: number };
+type Summary = { total: number; billable: number; failed: number; totalPages: number };
 
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("th-TH", {
@@ -184,13 +184,15 @@ export default function UploadTransactionsReport() {
       {/* Summary */}
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-          <StatCard tone="blue" label={th ? "นับเรียกเก็บเงินได้ (อ่านสำเร็จ)" : "Billable scans"} value={summary.billable}
-            hint={th ? "ยอดที่ใช้ออกใบแจ้งหนี้" : "Use this for invoicing"} />
           <StatCard tone="slate" label={th ? "อัปโหลดทั้งหมด" : "Total uploads"} value={summary.total} />
+          <StatCard tone="blue" label={th ? "อ่านสำเร็จ" : "Succeeded"} value={summary.billable}
+            hint={th ? "ยอดที่ใช้ออกใบแจ้งหนี้" : "Use this for invoicing"} />
+          <StatCard tone="red" label={th ? "อ่านไม่สำเร็จ" : "Failed"} value={summary.failed} />
           <StatCard tone="slate" label={th ? "จำนวนหน้ารวม" : "Total pages"} value={summary.totalPages} />
-          <StatCard tone="red" label={th ? "อ่านไม่สำเร็จ (ไม่นับเงิน)" : "Failed (not billed)"} value={summary.failed} />
-          <StatCard tone="amber" label={th ? "สแกนแล้วไม่ได้บันทึกเคส" : "Scanned but discarded"} value={summary.discarded}
-            hint={th ? "อ่านสำเร็จแต่ไม่มีเลขเคส" : "Succeeded with no case saved"} />
+          {/* Divides by total uploads so it visibly reconciles with the two
+              cards beside it (total pages ÷ total uploads). */}
+          <StatCard tone="slate" label={th ? "เฉลี่ยจำนวนหน้า" : "Avg. pages"}
+            value={summary.total > 0 ? Math.round((summary.totalPages / summary.total) * 10) / 10 : 0} />
         </div>
       )}
 
