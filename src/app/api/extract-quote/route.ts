@@ -20,11 +20,41 @@ function detectSeverityTier(name: string): "minor" | "moderate" | "severe" | "re
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/**
+ * Total pages across the request's files, for the billing ledger: a PDF
+ * contributes its own page count, an image counts as one. A file that can't be
+ * opened contributes nothing rather than failing the scan.
+ */
+async function countPages(files: any[]): Promise<number> {
+  let pdfParse: any = null;
+  try {
+    pdfParse = require("pdf-parse/lib/pdf-parse.js");
+  } catch {
+    return 0;
+  }
+
+  let pages = 0;
+  for (const f of files) {
+    if (!f?.data) continue;
+    if (String(f.mediaType || "").startsWith("image/")) {
+      pages += 1;
+      continue;
+    }
+    try {
+      const res = await pdfParse(Buffer.from(f.data, "base64"));
+      pages += Number(res?.numpages) || 0;
+    } catch {
+      // Unreadable file — the scan itself will fail and won't be billed.
+    }
+  }
+  return pages;
+}
+
 export async function POST(req: NextRequest) {
   // Declared outside the try so the catch can still attribute a failed scan.
   let scanLog: {
     userEmail: string; userName: string; branchName: string | null;
-    fileName: string; fileCount: number; mode: "single" | "batch";
+    fileName: string; fileCount: number; mode: "single" | "batch"; pageCount: number;
   } | null = null;
 
   try {
@@ -44,7 +74,13 @@ export async function POST(req: NextRequest) {
       fileName: String(files[0]?.name || "ไม่ทราบชื่อไฟล์"),
       fileCount: files.length,
       mode: body.mode === "batch" ? "batch" : "single",
+      pageCount: 0,
     };
+
+    // Page count for the billing ledger. Done in its own pass because the
+    // extraction loop below breaks as soon as one file yields items, which
+    // would leave the remaining files uncounted.
+    scanLog.pageCount = await countPages(files);
 
     let parsedResult: any = {};
     let pdfTextExtracted = false;

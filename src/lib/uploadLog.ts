@@ -6,6 +6,7 @@ export type RecordUploadInput = {
   branchName?: string | null;
   fileName: string;
   fileCount?: number;
+  pageCount?: number;
   mode?: "single" | "batch";
   success?: boolean;
   errorMessage?: string | null;
@@ -28,6 +29,7 @@ export async function recordUploadTransaction(input: RecordUploadInput): Promise
         branchName: input.branchName ?? null,
         fileName: input.fileName.slice(0, 300),
         fileCount: input.fileCount ?? 1,
+        pageCount: input.pageCount ?? 0,
         mode: input.mode ?? "single",
         success: input.success ?? true,
         // Guard against an oversized stack trace bloating the table.

@@ -10,6 +10,7 @@ type Row = {
   branchName: string | null;
   fileName: string;
   fileCount: number;
+  pageCount: number;
   mode: string;
   success: boolean;
   errorMessage: string | null;
@@ -19,7 +20,7 @@ type Row = {
   createdAt: string;
 };
 
-type Summary = { total: number; billable: number; failed: number; discarded: number };
+type Summary = { total: number; billable: number; failed: number; discarded: number; totalPages: number };
 
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("th-TH", {
@@ -110,6 +111,7 @@ export default function UploadTransactionsReport() {
       "สาขา": r.branchName || "",
       "ชื่อไฟล์": r.fileName,
       "จำนวนไฟล์": r.fileCount,
+      "จำนวนหน้า": r.pageCount || "",
       "โหมด": r.mode === "batch" ? "หลายเคส" : "เคสเดียว",
       "ผลการอ่าน": r.success ? "สำเร็จ" : "ไม่สำเร็จ",
       "รายการซ่อมที่อ่านได้": r.itemsFound,
@@ -118,7 +120,7 @@ export default function UploadTransactionsReport() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = [{ wch: 5 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 22 },
-      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 40 }];
+      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Upload Transactions");
     XLSX.writeFile(wb, `upload-transactions-${from}_${to}.xlsx`);
@@ -181,10 +183,11 @@ export default function UploadTransactionsReport() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
           <StatCard tone="blue" label={th ? "นับเรียกเก็บเงินได้ (อ่านสำเร็จ)" : "Billable scans"} value={summary.billable}
             hint={th ? "ยอดที่ใช้ออกใบแจ้งหนี้" : "Use this for invoicing"} />
           <StatCard tone="slate" label={th ? "อัปโหลดทั้งหมด" : "Total uploads"} value={summary.total} />
+          <StatCard tone="slate" label={th ? "จำนวนหน้ารวม" : "Total pages"} value={summary.totalPages} />
           <StatCard tone="red" label={th ? "อ่านไม่สำเร็จ (ไม่นับเงิน)" : "Failed (not billed)"} value={summary.failed} />
           <StatCard tone="amber" label={th ? "สแกนแล้วไม่ได้บันทึกเคส" : "Scanned but discarded"} value={summary.discarded}
             hint={th ? "อ่านสำเร็จแต่ไม่มีเลขเคส" : "Succeeded with no case saved"} />
@@ -206,6 +209,7 @@ export default function UploadTransactionsReport() {
                 <th className="px-3 py-3">{th ? "วันที่/เวลา" : "Date / Time"}</th>
                 <th className="px-3 py-3">{th ? "ผู้อัปโหลด" : "Uploaded by"}</th>
                 <th className="px-3 py-3">{th ? "ไฟล์" : "File"}</th>
+                <th className="px-3 py-3">{th ? "จำนวนหน้า" : "Pages"}</th>
                 <th className="px-3 py-3">{th ? "โหมด" : "Mode"}</th>
                 <th className="px-3 py-3">{th ? "สถานะ" : "Status"}</th>
                 <th className="px-3 py-3">{th ? "เลขที่เคส" : "Case No."}</th>
@@ -213,11 +217,11 @@ export default function UploadTransactionsReport() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "กำลังโหลด..." : "Loading..."}
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={7} className="px-3 py-10 text-center text-slate-400 text-sm">
                   {th ? "ไม่พบข้อมูลในช่วงเวลาที่เลือก" : "No records in the selected range"}
                 </td></tr>
               ) : pagedRows.map((r) => (
@@ -235,6 +239,15 @@ export default function UploadTransactionsReport() {
                       <div className="text-[11px] text-slate-400">
                         {th ? `รวม ${r.fileCount} ไฟล์` : `${r.fileCount} files`}
                       </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    {r.pageCount > 0 ? (
+                      <span className="text-xs font-bold text-slate-700 tabular-nums">
+                        {r.pageCount}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-300 font-medium">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5">

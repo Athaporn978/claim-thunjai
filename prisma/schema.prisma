@@ -376,6 +376,10 @@ model UploadTransactionLog {
   // single quote (the single-scan path), hence the count alongside the name.
   fileName  String
   fileCount Int    @default(1)
+  /// Total pages across the request's files: a PDF contributes its own page
+  /// count, an image counts as one. 0 means the files could not be opened at
+  /// all, which only happens on a scan that already failed.
+  pageCount Int    @default(0)
   /// "single" = one case from one or more files; "batch" = one case per file.
   mode      String @default("single")
 

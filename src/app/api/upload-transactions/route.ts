@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
         branchName: true,
         fileName: true,
         fileCount: true,
+        pageCount: true,
         mode: true,
         success: true,
         errorMessage: true,
@@ -53,6 +54,8 @@ export async function GET(req: NextRequest) {
         failed: rows.length - billable,
         // Billable scans that were never saved as a case — the wastage figure.
         discarded: rows.filter((r) => r.success && !r.quotationId).length,
+        // Raw page total for the operator's own analysis — no cost implied.
+        totalPages: rows.reduce((sum, r) => sum + (r.pageCount || 0), 0),
       },
     });
   } catch (err) {
