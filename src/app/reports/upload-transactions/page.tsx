@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/LangContext";
 import * as XLSX from "xlsx";
+import { fmtBaht } from "@/lib/quotation";
 
 type Row = {
   id: number;
@@ -11,6 +12,7 @@ type Row = {
   fileName: string;
   fileCount: number;
   pageCount: number;
+  amountThb: number;
   mode: string;
   success: boolean;
   errorMessage: string | null;
@@ -20,7 +22,7 @@ type Row = {
   createdAt: string;
 };
 
-type Summary = { total: number; billable: number; failed: number; totalPages: number };
+type Summary = { total: number; billable: number; failed: number; totalPages: number; totalAmountThb: number };
 
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("th-TH", {
@@ -37,20 +39,66 @@ function monthRange(offset = 0) {
   return { from: iso(first), to: iso(last) };
 }
 
-function StatCard({ label, value, tone = "blue", hint }: {
-  label: string; value: number | string; tone?: "blue" | "slate" | "red" | "amber"; hint?: string;
+type Tone = "blue" | "indigo" | "emerald" | "red" | "white";
+const TONE_TEXT: Record<Tone, string> = {
+  blue: "text-[#0071e3]",
+  indigo: "text-indigo-700",
+  emerald: "text-emerald-600",
+  red: "text-red-600",
+  white: "text-white",
+};
+
+type Theme = "sky" | "mint" | "violet" | "hero";
+const THEME: Record<Theme, { card: string; title: string; label: string; hint: string; divider: string; iconBg: string }> = {
+  sky: {
+    card: "bg-gradient-to-br from-sky-50 via-blue-50 to-blue-100 border-blue-200",
+    title: "text-blue-900", label: "text-blue-700/70", hint: "text-blue-700/70",
+    divider: "border-blue-200", iconBg: "bg-white/80 shadow-sm",
+  },
+  mint: {
+    card: "bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 border-emerald-200",
+    title: "text-emerald-900", label: "text-slate-600", hint: "text-emerald-800/70",
+    divider: "border-emerald-200", iconBg: "bg-white/80 shadow-sm",
+  },
+  violet: {
+    card: "bg-gradient-to-br from-violet-50 via-indigo-50 to-indigo-100 border-indigo-200",
+    title: "text-indigo-900", label: "text-indigo-700/70", hint: "text-indigo-800/70",
+    divider: "border-indigo-200", iconBg: "bg-white/80 shadow-sm",
+  },
+  // The one figure an invoice is built from — premium blue, as the design rules ask.
+  hero: {
+    card: "bg-gradient-to-br from-blue-700 to-indigo-800 border-transparent shadow-lg shadow-blue-500/25",
+    title: "text-blue-100", label: "text-blue-100/80", hint: "text-blue-100/80",
+    divider: "border-white/20", iconBg: "bg-white/15",
+  },
+};
+
+/**
+ * One card, one topic, one or more figures side by side, everything centred.
+ * A figure gets its own colour so "succeeded / failed" or "total / average"
+ * read at a glance without splitting into separate cards.
+ */
+function MetricCard({ title, icon, hint, theme, metrics }: {
+  title: string;
+  icon: string;
+  hint?: string;
+  theme: Theme;
+  metrics: { label?: string; value: number | string; tone: Tone }[];
 }) {
-  const tones = {
-    blue: "bg-blue-50 border-blue-200 text-[#0071e3]",
-    slate: "bg-slate-50 border-slate-200 text-slate-700",
-    red: "bg-red-50 border-red-200 text-red-700",
-    amber: "bg-amber-50 border-amber-200 text-amber-700",
-  }[tone];
+  const t = THEME[theme];
   return (
-    <div className={`rounded-xl border p-4 ${tones}`}>
-      <div className="text-xs font-semibold opacity-80">{label}</div>
-      <div className="text-3xl font-extrabold mt-1 tabular-nums">{value}</div>
-      {hint && <div className="text-[11px] mt-1 opacity-70 font-medium">{hint}</div>}
+    <div className={`rounded-2xl border p-5 flex flex-col items-center text-center min-h-[164px] transition hover:-translate-y-0.5 hover:shadow-md ${t.card}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-2 ${t.iconBg}`}>{icon}</div>
+      <div className={`text-xs font-extrabold tracking-wide ${t.title}`}>{title}</div>
+      <div className={`mt-2 w-full grid ${metrics.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {metrics.map((m, i) => (
+          <div key={i} className={`flex flex-col items-center px-2 ${i > 0 ? `border-l ${t.divider}` : ""}`}>
+            <div className={`text-3xl font-black tabular-nums leading-none ${TONE_TEXT[m.tone]}`}>{m.value}</div>
+            {m.label && <div className={`text-[11px] font-semibold mt-1.5 ${t.label}`}>{m.label}</div>}
+          </div>
+        ))}
+      </div>
+      {hint && <div className={`text-[11px] mt-auto pt-2.5 font-medium ${t.hint}`}>{hint}</div>}
     </div>
   );
 }
@@ -106,21 +154,21 @@ export default function UploadTransactionsReport() {
     const data = filtered.map((r, i) => ({
       "#": i + 1,
       "วันที่/เวลา": fmtDateTime(r.createdAt),
+      "เลขที่เคส": r.quotationNo || "",
       "ผู้อัปโหลด": r.userName,
       "อีเมล": r.userEmail,
       "สาขา": r.branchName || "",
       "ชื่อไฟล์": r.fileName,
       "จำนวนไฟล์": r.fileCount,
       "จำนวนหน้า": r.pageCount || "",
-      "โหมด": r.mode === "batch" ? "หลายเคส" : "เคสเดียว",
       "ผลการอ่าน": r.success ? "สำเร็จ" : "ไม่สำเร็จ",
       "รายการซ่อมที่อ่านได้": r.itemsFound,
-      "เลขที่เคส": r.quotationNo || "",
+      "จำนวนเงิน (บาท)": r.amountThb,
       "หมายเหตุ": r.errorMessage || "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws["!cols"] = [{ wch: 5 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 22 },
-      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 40 }];
+    ws["!cols"] = [{ wch: 5 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 22 },
+      { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Upload Transactions");
     XLSX.writeFile(wb, `upload-transactions-${from}_${to}.xlsx`);
@@ -183,16 +231,42 @@ export default function UploadTransactionsReport() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-          <StatCard tone="slate" label={th ? "อัปโหลดทั้งหมด" : "Total uploads"} value={summary.total} />
-          <StatCard tone="blue" label={th ? "อ่านสำเร็จ" : "Succeeded"} value={summary.billable}
-            hint={th ? "ยอดที่ใช้ออกใบแจ้งหนี้" : "Use this for invoicing"} />
-          <StatCard tone="red" label={th ? "อ่านไม่สำเร็จ" : "Failed"} value={summary.failed} />
-          <StatCard tone="slate" label={th ? "จำนวนหน้ารวม" : "Total pages"} value={summary.totalPages} />
-          {/* Divides by total uploads so it visibly reconciles with the two
-              cards beside it (total pages ÷ total uploads). */}
-          <StatCard tone="slate" label={th ? "เฉลี่ยจำนวนหน้า" : "Avg. pages"}
-            value={summary.total > 0 ? Math.round((summary.totalPages / summary.total) * 10) / 10 : 0} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+          <MetricCard
+            theme="sky"
+            icon="📤"
+            title={th ? "อัปโหลดทั้งหมด" : "Total uploads"}
+            hint={th ? "ครั้งที่อัปโหลดในช่วงที่เลือก" : "Uploads in the selected range"}
+            metrics={[{ value: summary.total, tone: "blue" }]}
+          />
+          <MetricCard
+            theme="mint"
+            icon="🔍"
+            title={th ? "ผลการอ่าน" : "Scan results"}
+            metrics={[
+              { label: th ? "อ่านสำเร็จ" : "Succeeded", value: summary.billable, tone: "emerald" },
+              { label: th ? "อ่านไม่สำเร็จ" : "Failed", value: summary.failed, tone: "red" },
+            ]}
+          />
+          <MetricCard
+            theme="violet"
+            icon="📄"
+            title={th ? "จำนวนหน้า" : "Pages"}
+            metrics={[
+              { label: th ? "รวม" : "Total", value: summary.totalPages, tone: "indigo" },
+              // ÷ total uploads so it reconciles against the figures beside it.
+              { label: th ? "เฉลี่ยต่อครั้ง" : "Avg. per upload",
+                value: summary.total > 0 ? Math.round((summary.totalPages / summary.total) * 10) / 10 : 0,
+                tone: "indigo" },
+            ]}
+          />
+          <MetricCard
+            theme="hero"
+            icon="💰"
+            title={th ? "รวมค่าใช้จ่าย" : "Total charges"}
+            hint={th ? "คิดเฉพาะเคสที่อ่านสำเร็จ · ไม่รวมภาษีมูลค่าเพิ่ม (VAT)" : "Successful scans only · excludes VAT"}
+            metrics={[{ value: `฿${fmtBaht(summary.totalAmountThb, lang as "th" | "en")}`, tone: "white" }]}
+          />
         </div>
       )}
 
@@ -206,15 +280,15 @@ export default function UploadTransactionsReport() {
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-center text-xs font-bold text-slate-500">
+            <thead className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border-b-2 border-blue-200">
+              <tr className="text-center text-xs font-extrabold text-blue-900">
                 <th className="px-3 py-3">{th ? "วันที่/เวลา" : "Date / Time"}</th>
+                <th className="px-3 py-3">{th ? "เลขที่เคส" : "Case No."}</th>
                 <th className="px-3 py-3">{th ? "ผู้อัปโหลด" : "Uploaded by"}</th>
                 <th className="px-3 py-3">{th ? "ไฟล์" : "File"}</th>
                 <th className="px-3 py-3">{th ? "จำนวนหน้า" : "Pages"}</th>
-                <th className="px-3 py-3">{th ? "โหมด" : "Mode"}</th>
                 <th className="px-3 py-3">{th ? "สถานะ" : "Status"}</th>
-                <th className="px-3 py-3">{th ? "เลขที่เคส" : "Case No."}</th>
+                <th className="px-3 py-3">{th ? "จำนวนเงิน (บาท)" : "Amount (THB)"}</th>
               </tr>
             </thead>
             <tbody>
@@ -228,15 +302,27 @@ export default function UploadTransactionsReport() {
                 </td></tr>
               ) : pagedRows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition">
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs tabular-nums">
+                  <td className="px-3 py-2.5 text-center whitespace-nowrap text-slate-600 text-xs tabular-nums">
                     {fmtDateTime(r.createdAt)}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                    {r.quotationNo ? (
+                      <a href={`/quotations/${r.quotationId}`}
+                        className="text-[#0071e3] font-bold text-xs hover:underline">
+                        {r.quotationNo}
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {th ? "— ไม่ได้บันทึกเคส" : "— not saved"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
                     <div className="font-semibold text-slate-800 text-xs">{r.userName}</div>
                     <div className="text-[11px] text-slate-400">{r.branchName || r.userEmail}</div>
                   </td>
-                  <td className="px-3 py-2.5">
-                    <div className="text-xs text-slate-700 truncate max-w-[260px]" title={r.fileName}>{r.fileName}</div>
+                  <td className="px-3 py-2.5 text-center">
+                    <div className="text-xs text-slate-700 truncate max-w-[260px] mx-auto" title={r.fileName}>{r.fileName}</div>
                     {r.fileCount > 1 && (
                       <div className="text-[11px] text-slate-400">
                         {th ? `รวม ${r.fileCount} ไฟล์` : `${r.fileCount} files`}
@@ -252,12 +338,7 @@ export default function UploadTransactionsReport() {
                       <span className="text-[11px] text-slate-300 font-medium">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5">
-                    <span className="text-[11px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-600 whitespace-nowrap">
-                      {r.mode === "batch" ? (th ? "หลายเคส" : "Batch") : (th ? "เคสเดียว" : "Single")}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 text-center">
                     {r.success ? (
                       <span className="text-[11px] font-bold text-emerald-700 whitespace-nowrap">
                         ✅ {th ? `อ่านได้ ${r.itemsFound} รายการ` : `${r.itemsFound} items`}
@@ -268,16 +349,13 @@ export default function UploadTransactionsReport() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    {r.quotationNo ? (
-                      <a href={`/quotations/${r.quotationId}`}
-                        className="text-[#0071e3] font-bold text-xs hover:underline">
-                        {r.quotationNo}
-                      </a>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {th ? "— ไม่ได้บันทึกเคส" : "— not saved"}
+                  <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                    {r.amountThb > 0 ? (
+                      <span className="text-xs font-extrabold text-slate-800 tabular-nums">
+                        ฿{fmtBaht(r.amountThb, lang as "th" | "en")}
                       </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-300 font-medium">฿0.00</span>
                     )}
                   </td>
                 </tr>

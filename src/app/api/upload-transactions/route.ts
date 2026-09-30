@@ -4,6 +4,13 @@ import { prisma } from "@/lib/db";
 export const runtime = "nodejs";
 
 /**
+ * Price charged to the customer per successful scan (THB, excl. VAT). This is
+ * the invoice figure, not our cost — cost stays in ApiUsageLog. Failed scans
+ * are free, so their amount is 0.
+ */
+const PRICE_PER_SUCCESSFUL_SCAN_THB = 50;
+
+/**
  * Billing ledger feed for /reports/upload-transactions.
  *
  * Returns NO cost figures by design — this report is shown to the customer the
@@ -47,13 +54,15 @@ export async function GET(req: NextRequest) {
     const billable = rows.filter((r) => r.success).length;
 
     return NextResponse.json({
-      rows,
+      rows: rows.map((r) => ({ ...r, amountThb: r.success ? PRICE_PER_SUCCESSFUL_SCAN_THB : 0 })),
       summary: {
         total: rows.length,
         billable,
         failed: rows.length - billable,
         // Raw page total for the operator's own analysis — no cost implied.
         totalPages: rows.reduce((sum, r) => sum + (r.pageCount || 0), 0),
+        // Invoice total (THB, excl. VAT): the customer-facing price, not our cost.
+        totalAmountThb: billable * PRICE_PER_SUCCESSFUL_SCAN_THB,
       },
     });
   } catch (err) {
