@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { totals, type QuotationInput } from "@/lib/quotation";
 import { linkUsageToQuotation } from "@/lib/aiUsage";
-import { linkUploadToQuotation } from "@/lib/uploadLog";
+import { linkUploadToQuotation, markUploadSaveFailed } from "@/lib/uploadLog";
 import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -90,8 +90,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/quotations → create
 export async function POST(req: NextRequest) {
+  // Hoisted so the catch can attribute a failed save to its scan row.
+  let scanRowId: number | null = null;
   try {
     const body = (await req.json()) as QuotationInput;
+    const rawUploadLogId = Number((body as any).uploadLogId);
+    if (Number.isFinite(rawUploadLogId) && rawUploadLogId > 0) scanRowId = rawUploadLogId;
     const t = totals(body.items || []);
 
     // Load Workflow Settings to determine initial status
@@ -191,6 +195,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ quotation: created });
   } catch (err) {
     console.error("Create quotation error:", err);
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Unknown";
+    if (scanRowId != null) await markUploadSaveFailed(scanRowId, msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

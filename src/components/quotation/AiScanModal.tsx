@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_SCAN_CASES, scanAndSaveCase, type ScanCaseResult } from "@/lib/aiScan";
 
 type SlotStatus = "idle" | "scanning" | "saving" | "done" | "error";
@@ -30,6 +30,32 @@ export function AiScanModal({
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const [leaveNotice, setLeaveNotice] = useState(false);
+
+  // While a run is in flight, leaving loses every case not yet saved: the
+  // browser's own dialog covers tab close / reload, and in-app links (which
+  // never fire beforeunload) are intercepted with an inline notice instead of
+  // a native dialog. Both are removed the moment the run ends.
+  useEffect(() => {
+    if (!running) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute("href") || "";
+      if (href.startsWith("#") || href.startsWith("javascript:")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaveNotice(true);
+      window.setTimeout(() => setLeaveNotice(false), 3500);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [running]);
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const patch = useCallback((key: number, p: Partial<Slot>) => {
@@ -81,7 +107,7 @@ export function AiScanModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/40 backdrop-blur-sm p-4 sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-blue-900/30 backdrop-blur-sm p-4 sm:p-6">
       <div className="w-full max-w-2xl my-4 bg-white rounded-2xl shadow-2xl border border-slate-200">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-200">
@@ -253,6 +279,14 @@ export function AiScanModal({
             </button>
           )}
         </div>
+
+        {leaveNotice && (
+          <div className="mx-5 mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+            ⚠️ {th
+              ? "กำลังสแกนอยู่ — กรุณารอให้เสร็จก่อนออกจากหน้านี้ ไม่เช่นนั้นเคสที่ยังไม่บันทึกจะหาย"
+              : "Scan in progress — please wait for it to finish before leaving, or unsaved cases will be lost"}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200">

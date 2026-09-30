@@ -13,6 +13,8 @@ type Row = {
   fileCount: number;
   pageCount: number;
   amountThb: number;
+  saveError: string | null;
+  outcome: "scan_failed" | "case_created" | "save_failed" | "pending" | "client_interrupted";
   // Present only when the API judged the session to be the system owner.
   aiUsed?: boolean;
   model?: string | null;
@@ -175,7 +177,11 @@ export default function UploadTransactionsReport() {
       "ผลการอ่าน": r.success ? "สำเร็จ" : "ไม่สำเร็จ",
       "รายการซ่อมที่อ่านได้": r.itemsFound,
       "จำนวนเงิน (บาท)": r.amountThb,
-      "หมายเหตุ": r.errorMessage || "",
+      "หมายเหตุ":
+        r.outcome === "client_interrupted" ? "ปิดหน้าต่าง/หลุดการเชื่อมต่อระหว่างทำงาน (เหตุจากฝั่งผู้ใช้ ไม่ใช่ระบบ)"
+        : r.outcome === "save_failed" ? `ระบบบันทึกเคสล้มเหลว: ${r.saveError || ""}`
+        : r.outcome === "pending" ? "กำลังบันทึก"
+        : r.errorMessage || "",
       ...(summary?.owner
         ? {
             "ใช้ AI": r.aiUsed ? "ใช่" : "ไม่",
@@ -382,10 +388,25 @@ export default function UploadTransactionsReport() {
                         className="text-[#0071e3] font-bold text-xs hover:underline">
                         {r.quotationNo}
                       </a>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {th ? "— ไม่ได้บันทึกเคส" : "— not saved"}
+                    ) : r.outcome === "client_interrupted" ? (
+                      <span
+                        className="text-[11px] font-bold text-amber-700 whitespace-normal"
+                        title={th
+                          ? "อ่านสำเร็จแล้ว แต่คำสั่งบันทึกเคสไม่เคยมาถึงระบบ — ผู้ใช้ปิดหน้าต่าง ไฟดับ หรือหลุดการเชื่อมต่อระหว่างทำงาน (เหตุจากฝั่งผู้ใช้ ไม่ใช่ระบบ)"
+                          : "Scan succeeded but no save request ever reached the server — the user closed the window, lost power or connection (user-side, not a system fault)"}
+                      >
+                        ⚠️ {th ? "ปิดหน้าต่างระหว่างทำงาน (ฝั่งผู้ใช้)" : "Closed mid-run (user-side)"}
                       </span>
+                    ) : r.outcome === "save_failed" ? (
+                      <span className="text-[11px] font-bold text-red-700 whitespace-normal" title={r.saveError || ""}>
+                        ❌ {th ? "ระบบบันทึกเคสล้มเหลว" : "System failed to save"}
+                      </span>
+                    ) : r.outcome === "pending" ? (
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        ⏳ {th ? "กำลังบันทึก…" : "Saving…"}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 font-medium">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-center">

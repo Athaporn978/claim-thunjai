@@ -403,6 +403,12 @@ model UploadTransactionLog {
   /// server-side for the system owner.
   apiUsageLogId Int?
 
+  /// Set only when a save request for this scan REACHED the server and failed
+  /// there. Its absence on a case-less successful scan is the evidence that the
+  /// client went away (closed tab, power loss, network) before saving — a
+  /// user-side interruption, not a system fault — and the report says so.
+  saveError String?
+
   createdAt DateTime @default(now())
 
   @@index([createdAt])

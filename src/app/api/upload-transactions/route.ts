@@ -56,13 +56,27 @@ export async function GET(req: NextRequest) {
         quotationNo: true,
         createdAt: true,
         apiUsageLogId: true,
+        saveError: true,
       },
     });
 
     const billable = rows.filter((r) => r.success).length;
+    // A successful scan with no case is judged by evidence: a recorded save
+    // error means the server failed; no save ever arriving means the client
+    // went away. Anything younger than the grace period may still be saving.
+    const GRACE_MS = 2 * 60 * 1000;
+    const now = Date.now();
+    const outcomeOf = (r: Pick<(typeof rows)[number], "success" | "quotationId" | "saveError" | "createdAt">) => {
+      if (!r.success) return "scan_failed" as const;
+      if (r.quotationId) return "case_created" as const;
+      if (r.saveError) return "save_failed" as const;
+      if (now - new Date(r.createdAt).getTime() < GRACE_MS) return "pending" as const;
+      return "client_interrupted" as const;
+    };
     const priced = rows.map(({ apiUsageLogId, ...r }) => ({
       ...r,
       amountThb: r.success ? PRICE_PER_SUCCESSFUL_SCAN_THB : 0,
+      outcome: outcomeOf(r),
       _usageId: apiUsageLogId,
     }));
     const summary = {

@@ -47,6 +47,18 @@ export async function recordUploadTransaction(input: RecordUploadInput): Promise
   }
 }
 
+/** Records that a save for this scan reached the server and failed there. Never throws. */
+export async function markUploadSaveFailed(uploadLogId: number, message: string) {
+  try {
+    await prisma.uploadTransactionLog.update({
+      where: { id: uploadLogId },
+      data: { saveError: message.slice(0, 500) },
+    });
+  } catch (err) {
+    console.error("markUploadSaveFailed failed (ignored):", err);
+  }
+}
+
 /**
  * Attaches a scan row to the case it produced. The scan runs before the
  * quotation exists, so this can only happen once the case is saved — rows left
