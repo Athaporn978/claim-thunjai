@@ -32,21 +32,6 @@ export async function fileToScanPayload(file: File): Promise<ScanPayload> {
   };
 }
 
-export function resolveSessionUser() {
-  let s: any = null;
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem("claim_user_session") : null;
-    if (raw) s = JSON.parse(raw);
-  } catch {}
-  const email = s?.email || "somchai@htechnology.com";
-  return {
-    email,
-    name: s?.name || s?.fullName || (email.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี"),
-    branch: s?.branchName || s?.branch || (email.includes("kanya") ? "สาขาเชียงใหม่" : "สาขากรุงเทพฯ (ลาดพร้าว)"),
-    role: s?.roleName || s?.role?.name || "เจ้าหน้าที่คุมราคา",
-  };
-}
-
 /** Maps one extraction result onto the quotation form shape. */
 export function buildFormFromExtraction(meta: any, items: any[], files: ScanPayload[]): QuotationInput {
   let matchedBrandName = meta.vehicleBrand || "";
@@ -157,17 +142,12 @@ export async function scanAndSaveCase(files: File[]): Promise<ScanCaseResult> {
   if (!res.ok || data.error) throw new Error(data.error || "อ่านเอกสารไม่สำเร็จ");
 
   const draft = buildFormFromExtraction(data.metadata || {}, data.items || [], payloads);
-  const u = resolveSessionUser();
-
   const saveRes = await fetch("/api/quotations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...draft,
       creationMode: "ai_extract",
-      createdByName: u.name,
-      createdByEmail: u.email,
-      branchName: u.branch,
       usageLogId: typeof data.usageLogId === "number" ? data.usageLogId : null,
       uploadLogId: typeof data.uploadLogId === "number" ? data.uploadLogId : null,
     }),

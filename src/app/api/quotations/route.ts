@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { totals, type QuotationInput } from "@/lib/quotation";
 import { linkUsageToQuotation } from "@/lib/aiUsage";
 import { linkUploadToQuotation, markUploadSaveFailed } from "@/lib/uploadLog";
+import { getSession, isSuperAdmin } from "@/lib/session";
+import { pickBranch } from "@/lib/branchMatch";
 import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -103,21 +105,30 @@ export async function POST(req: NextRequest) {
     const isWfDisabled = !wfSetting || wfSetting.enabled === false || wfSetting.ruleMode === "DIRECT";
     const targetStatus = isWfDisabled ? "approved" : (body.status === "draft" ? "draft" : "pending_approval");
 
-    const createdByEmail = (body as any).createdByEmail || "somchai@htechnology.com";
-    const createdByName = (body as any).createdByName || (createdByEmail.includes("kanya") ? "กัญญา มีสุข" : "สมชาย ใจดี");
+    // Creator identity comes from the signed session cookie, never from the
+    // body: the browser used to send these and, through a broken localStorage
+    // key, sent the same default user for everyone — every case landed on one
+    // employee in one branch, hidden from its real creator by branch RBAC.
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized — กรุณาเข้าสู่ระบบก่อนใช้งาน" }, { status: 401 });
+    }
+    const createdByEmail = session.email;
+    const createdByName = session.name;
 
-    // Assign Creator Branch
-    let branchId = (body as any).branchId;
+    // The creator's own branch. A client-supplied branchId is honoured only
+    // for Super Admins, who legitimately file cases on behalf of any branch.
+    const requestedBranchId = (body as any).branchId;
+    let branchId: string | undefined =
+      isSuperAdmin(session) && typeof requestedBranchId === "string" ? requestedBranchId : undefined;
     if (!branchId) {
-      const bName = (body as any).branchName || (createdByEmail.includes("kanya") ? "เชียงใหม่" : "ลาดพร้าว");
-      const matchedBranch = await prisma.branch.findFirst({
-        where: { name: { contains: bName.replace(/\(.*\)/, "").trim() } },
-      });
-      if (matchedBranch) {
-        branchId = matchedBranch.id;
+      const branches = await prisma.branch.findMany({ select: { id: true, code: true, name: true } });
+      const picked = pickBranch(branches, session.branchName);
+      if (picked) {
+        branchId = picked.id;
       } else {
-        const latPhraoBranch = await prisma.branch.findFirst({ where: { code: "BR-01" } });
-        branchId = latPhraoBranch?.id;
+        console.warn(`No branch matches session branch "${session.branchName}" for ${session.email}; defaulting to BR-01`);
+        branchId = branches.find((b) => b.code === "BR-01")?.id;
       }
     }
 

@@ -9,7 +9,6 @@ import { totals, fmtBaht, type QuotationInput, type QuotationItemInput, type Quo
 import { useSidebar } from "@/lib/SidebarContext";
 import { validateVin } from "@/lib/vinValidation";
 import { CreationModeBadge } from "@/components/quotation/CreationModeBadge";
-import { resolveSessionUser } from "@/lib/aiScan";
 
 const EMPTY: QuotationInput = {
   status: "draft",
@@ -238,16 +237,10 @@ function Wizard() {
   const save = async (opts?: { finalize?: boolean; thenView?: boolean }) => {
     setSaving(true);
     try {
-      const { email: userEmail, name: userName, branch: userBranch, role: userRole } = resolveSessionUser();
       const payload: any = {
         ...form,
-        createdByName: userName,
-        createdByEmail: userEmail,
-        branchName: userBranch,
         status: (opts?.finalize || opts?.thenView) ? "completed" : (form.status || "draft"),
         // For EDITED audit log on PUT
-        _editorName: userName,
-        _editorRole: userRole,
       };
       const res = await fetch(id ? `/api/quotations/${id}` : "/api/quotations", {
         method: id ? "PUT" : "POST",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { totals, type QuotationInput } from "@/lib/quotation";
+import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function PUT(req: NextRequest, { params }: Ctx) {
   try {
     const { id } = await params;
-    const body = (await req.json()) as QuotationInput & { _editorName?: string; _editorRole?: string };
+    const body = (await req.json()) as QuotationInput;
+    const session = await getSession();
     const t = totals(body.items || []);
 
     // Snapshot before for change summary
@@ -109,8 +111,8 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     await prisma.quotationLog.create({
       data: {
         quotationId: id,
-        authorName: body._editorName || "เจ้าหน้าที่",
-        authorRole: body._editorRole || "",
+        authorName: session?.name || "เจ้าหน้าที่",
+        authorRole: session?.roleName || "",
         action: "EDITED",
         comment: changes.join(" | "),
       },
