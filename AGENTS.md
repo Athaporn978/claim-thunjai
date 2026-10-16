@@ -77,28 +77,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Main Branch**: `main`
 
 # VPS Production & Deployment Specification
-> ⚠️ ข้อมูลชุดนี้ตรวจสอบจริงบนเซิร์ฟเวอร์แล้วเมื่อ 30 ก.ย. 2569 — ค่าเดิม 4 จุด (SSH key, PM2 ID, user, ไฟล์ DB) **ผิดทั้งหมด** ดูหัวข้อบทเรียนท้ายไฟล์
+> 🔁 **ย้ายเครื่องแล้ว 2026-10-14** — ข้อมูล server (IP / SSH key / user / วิธี deploy มาตรฐาน) อยู่ที่ไฟล์กลาง **`/Users/arthur/Documents/Claude Project/infra/INFRA.md`** ที่เดียว (ใช้ skill `thunjai-infra`) ถ้าข้อมูลด้านล่างขัดกับ INFRA.md ให้เชื่อ INFRA.md
+> เครื่องเก่า `103.76.181.143` (vps503) ถูกยกเลิก + ล้างดิสก์แล้ว — ห้ามใช้
 
-- **VPS Server IP**: `103.76.181.143` (SSH เข้าด้วย user `root`)
-- **SSH Key**: `~/.ssh/vps503_root` ← **ห้ามใช้ `~/.ssh/thunjaipos_tunnel` (Permission denied)**
-- **Directory Path**: `/var/www/demo-claim`
-- **เจ้าของไฟล์ / user ที่รันแอปจริง**: `deploy` (**ไม่ใช่ `root`**)
-- **PM2 Process Name / ID**: `demo-claim` (ID: **2**) — ID 6 ปัจจุบันคือ `chat-thunjai` คนละโปรเจกต์
-- **Port**: `3125` (nginx reverse proxy → `127.0.0.1:3125`)
-- **ไฟล์ฐานข้อมูล Production**: `prisma/demo.db` (~426MB) — **ไม่ใช่ `dev.db`** (`dev.db` คือของเครื่อง Local)
+ข้อมูลเฉพาะของโปรเจกต์นี้ (ตรวจบนเครื่องใหม่ ttj-uat แล้ว 2026-10-14):
+- **Directory Path**: `/var/www/demo-claim` (owner `deploy` — รันคำสั่ง git/npm/pm2 ในนาม `deploy` เสมอ ไม่ใช่ root)
+- **PM2 Process Name**: `demo-claim` — **อ้างด้วยชื่อเท่านั้น ห้ามอ้าง ID** (ID เปลี่ยนตอนย้ายเครื่อง)
+- **Port**: `3125` bind `127.0.0.1` (nginx → `127.0.0.1:3125`) · ใช้ `pm2 restart demo-claim` ห้าม `pm2 delete` แล้วสร้างใหม่เอง (ตัวที่รันอยู่ตั้ง `-p 3125 -H 127.0.0.1` ไว้)
+- **ไฟล์ฐานข้อมูล Production**: `prisma/demo.db` (~430MB) — **ไม่ใช่ `dev.db`** (`dev.db` คือของเครื่อง Local)
 - **env ที่ต้องมีใน `.env` ทั้ง Local และ Production**: `ANTHROPIC_API_KEY`, `DATABASE_URL`, `SYSTEM_OWNER_EMAILS` (อีเมลเจ้าของระบบ คั่นด้วย `,`), `USD_TO_THB` (อัตราแปลงต้นทุน AI) — ดู `.env.example`
-- **Live Production URL**: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
-
-- **Zero-Downtime Deployment Command**:
-  ```bash
-  ssh -i ~/.ssh/vps503_root root@103.76.181.143 "su - deploy -c 'cd /var/www/demo-claim && git fetch origin main && git reset --hard origin/main && npm install && npx prisma generate && npx prisma db push && npm run build && pm2 restart demo-claim'"
-  ```
-  **ต้องครอบด้วย `su - deploy -c '...'` เสมอ** ถ้ารันตรงด้วย root จะเจอ `fatal: detected dubious ownership` และถ้าฝืนข้ามไป ไฟล์ `node_modules/` กับ `.next/` จะกลายเป็นของ root ทำให้แอปที่รันด้วย user `deploy` พังทันที
-
-- **Backup ฐานข้อมูลก่อน `prisma db push` ทุกครั้ง** (บังคับ เมื่อมีการแก้ schema):
-  ```bash
-  ssh -i ~/.ssh/vps503_root root@103.76.181.143 "cd /var/www/demo-claim/prisma && cp demo.db demo.db.bak-\$(date +%Y%m%d-%H%M%S)"
-  ```
+- **Live URL**: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
+- repo เป็น public → บนเครื่อง `git fetch` ผ่าน https ได้เลย
+- **ขั้นตอน deploy** (ทุกครั้งต้องได้รับอนุมัติ deploy ก่อน): สำรอง `prisma/demo.db` เป็น `demo.db.bak-<timestamp>` (ลบทิ้งเมื่อไม่ใช้ — ไฟล์ละ ~430MB) → `git fetch` + checkout commit ที่อนุมัติ → `npm ci` → `npx prisma generate` (+ `npx prisma db push` ถ้า schema เปลี่ยน) → `npm run build` → `pm2 restart demo-claim --update-env` → ตรวจในเบราว์เซอร์จริง · คำสั่ง SSH เต็มดู INFRA.md §6
+- **ข้อจำกัดบนเครื่องใหม่ที่ควรรู้ตอนทดสอบ**: POST `/api/auth/login` ถูก rate limit 10 ครั้ง/นาที/IP (เกินได้ 429) · ห้ามทิ้ง dump/ไฟล์ชั่วคราวไว้ใน `/tmp`
 
 # Completed Tasks Log (บันทึกผลงานที่ดำเนินการเสร็จสิ้นเรียบร้อยแล้ว)
 1. **🤖 AI Document Extraction (Nissan & Multi-brand Support)**:
@@ -115,7 +106,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 6. **🐙 GitHub Repository Integration**:
    - สร้างและเชื่อมต่อโปรเจกต์เข้ากับ GitHub Repository: `https://github.com/Athaporn978/claim-thunjai.git` สาขา `main`
 7. **🚀 VPS Production Deployment & 100% Full Clone**:
-   - Deploy ขึ้นระบบ Production VPS `103.76.181.143` (`/var/www/demo-claim`) PM2 ID: 6 `demo-claim`
+   - Deploy ขึ้นระบบ VPS เดิม (vps503, ยกเลิกแล้ว 2026-10-14 — ปัจจุบันอยู่ ttj-uat ดู INFRA.md) (`/var/www/demo-claim`) PM2 `demo-claim`
    - ซิงค์ฐานข้อมูล `dev.db` และแคตตาล็อกราคากลางค่าแรงซ่อม 504 รายการหลัก + อะไหล่ทุกยี่ห้อ พร้อมเปิดใช้งานจริงที่: [https://demo-claim.techthunjai.com/](https://demo-claim.techthunjai.com/)
 8. **🔒 Private Sample Excel Files (Data Directory Only)**:
    - สร้างไฟล์ตัวอย่าง Excel 2 ไฟล์ (`sample_parts_catalog_import.xlsx` และ `sample_repair_labor_import.xlsx`) จัดเก็บไว้ในโฟลเดอร์ปิด `data/` ในเครื่อง Local เท่านั้น และถอดออกจาก `public/` บนเว็บทั้งหมดเพื่อความปลอดภัยสูงสุด
